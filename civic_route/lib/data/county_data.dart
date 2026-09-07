@@ -1,14 +1,8 @@
 import '../models/contact.dart';
 
 final Map<String, List<Contact>> countyDictionary = {
-  "Your County, MD": [
-    Contact(
-      name: "REPLACE_ME",
-      office: "County Executive",
-      phone: "REPLACE_ME",
-      website: "REPLACE_ME",
-      level: "county",
-    ),
-    // add sheriff, public works, county council, etc.
+  "Your County Name": [
+    Contact(name: "REPLACE", office: "County Executive", phone: "REPLACE", level: "county"),
+    Contact(name: "REPLACE", office: "Sheriff", phone: "REPLACE", level: "county"),
   ],
 };

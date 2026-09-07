@@ -1,8 +1,14 @@
 import '../models/contact.dart';
 import '../models/location_info.dart';
 import 'congress_service.dart';
+import 'location_service.dart';
 import 'state_service.dart';
 import '../data/county_data.dart';
+
+LocationInfo? _cachedLocation;
+Future<LocationInfo> getCachedLocation(double lat, double lng) async {
+  return _cachedLocation ??= await resolveLocation(lat, lng);
+}
 
 Future<List<Contact>> getContactsForIssue(String level, LocationInfo location) async {
   switch (level) {
