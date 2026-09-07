@@ -1,14 +1,25 @@
-class Issue {
-  final String name;
-  final List<String> levels; // e.g. ["federal_house", "state"]
-  final String description;
+import 'package:flutter/material.dart';
 
-  Issue({required this.name, required this.levels, required this.description});
+class FaqItem {
+  final String question;
+  final String answer;
+  FaqItem({required this.question, required this.answer});
+}
+
+class Issue {
+  final String id;
+  final String name;
+  final List<String> levels;
+  final String description;
+  Issue({required this.id, required this.name, required this.levels, required this.description});
 }
 
 class IssueCategory {
+  final String id;
   final String name;
+  final IconData icon;
+  final String description;
   final List<Issue> subIssues;
-
-  IssueCategory({required this.name, required this.subIssues});
+  final List<FaqItem> faqs;
+  IssueCategory({required this.id, required this.name, required this.icon, required this.description, required this.subIssues, this.faqs = const []});
 }
