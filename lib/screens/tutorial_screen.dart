@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme.dart';
+import '../../theme.dart';
 import 'onboarding_screen.dart';
 
 class TutorialScreen extends StatefulWidget {
@@ -28,7 +28,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.brandPrimary,
+      backgroundColor: AppColors.light.brandPrimary,
       body: SafeArea(
         child: Column(
           children: [
@@ -53,8 +53,8 @@ class _TutorialScreenState extends State<TutorialScreen> {
                       children: [
                         Container(
                           width: 96, height: 96,
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), shape: BoxShape.circle),
-                          child: Icon(step.icon, color: AppColors.accent, size: 44),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), shape: BoxShape.circle),
+                          child: Icon(step.icon, color: AppColors.light.accent, size: 44),
                         ),
                         SizedBox(height: 32),
                         Text(step.title, textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
@@ -73,7 +73,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                 width: page == i ? 20 : 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: page == i ? AppColors.accent : Colors.white24,
+                  color: page == i ? AppColors.light.accent : Colors.white24,
                   borderRadius: BorderRadius.circular(4),
                 ),
               )),
@@ -89,7 +89,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
+                  backgroundColor: AppColors.light.accent,
                   minimumSize: Size(double.infinity, 56),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'env_loader.dart';
-import '../models/contact.dart';
+import '../../models/contact.dart';
 
 Future<List<Contact>> fetchStateLegislators(double lat, double lng) async {
   final apiKey = appEnv['OPENSTATES_API_KEY'];
@@ -24,11 +24,20 @@ Future<List<Contact>> fetchStateLegislators(double lat, double lng) async {
 
   return stateOnly.map((p) {
     final role = p['current_role'];
+    // OpenStates' `email` field is sometimes a real mailto address and
+    // sometimes a contact-form link. The UI's "Website" button assumes an
+    // http(s) URL it can launch, so only pass it through when it actually
+    // looks like one — otherwise leave website null rather than handing the
+    // button a broken link.
+    final rawContact = p['email']?.toString();
+    final website = (rawContact != null && rawContact.startsWith('http'))
+        ? rawContact
+        : null;
     return Contact(
       name: p['name'] ?? 'Unknown',
       office: role?['title'] ?? 'State Legislator',
       phone: null, // not available from this endpoint
-      website: p['email'], // often a contact-form URL, not a real email — label accordingly in UI
+      website: website,
       level: 'state',
     );
   }).toList();

@@ -34,13 +34,23 @@ Future<LocationInfo> resolveLocation(double lat, double lng) async {
   final countyData = counties[0];
 
   final districts = geographies['119th Congressional Districts'] as List?;
+  // This used to throw and take down the ENTIRE location lookup — meaning
+  // even a county- or state-only issue (which never needs a House district)
+  // would fail with "No congressional district found," as you just saw.
+  // Now a missing district only affects House-rep lookups specifically;
+  // everything else still works.
+  String? district;
   if (districts == null || districts.isEmpty) {
-    throw Exception('No congressional district found for these coordinates.');
+    // ignore: avoid_print
+    print(
+      'resolveLocation: no "119th Congressional Districts" entry for '
+      'lat=$lat, lng=$lng. Geography layers actually returned by the '
+      'Census API: ${geographies.keys}',
+    );
+  } else {
+    final rawDistrict = districts[0]['CD119'] as String;
+    district = int.parse(rawDistrict).toString();
   }
-  final districtData = districts[0];
-
-  final rawDistrict = districtData['CD119'] as String;
-  final district = int.parse(rawDistrict).toString();
 
   return LocationInfo(
     county: countyData['NAME'],

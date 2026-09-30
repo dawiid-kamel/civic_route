@@ -12,9 +12,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "airports", name: "Airports", levels: ["federal_house", "federal_senate"], description: "FAA and federal aviation policy"),
     ],
     faqs: [
-      FaqItem(question: "Why isn't my pothole a federal issue?", answer: "Local roads are maintained by your city or county public works department, not the federal government. Your House rep can't fix a pothole, but your county can."),
-      FaqItem(question: "Who funds public transit?", answer: "Most buses and trains are run by a regional transit authority funded through your state, even though some federal grants help pay for it."),
-      FaqItem(question: "What about a highway near me?", answer: "Interstates and federal highways are funded through Congress, so your House rep and senators are the right contacts for those."),
+      FaqItem(question: "Who should I contact for a pothole or street repair?", answer: "Most road repairs are handled by your city or county public works office. Federal offices usually handle interstate or highway funding, not local potholes."),
+      FaqItem(question: "Why do I sometimes need a state office instead of a federal one?", answer: "Public transit and bus service are often run by regional agencies and funded through state policy, while interstates and airports are usually federal."),
     ],
   ),
   IssueCategory(
@@ -26,8 +25,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "rent-control", name: "Rent control & state housing law", levels: ["state"], description: "State legislature housing regulations"),
     ],
     faqs: [
-      FaqItem(question: "My landlord won't fix something — who do I call?", answer: "That's a local issue — your county or city has a housing authority or tenant board that handles disputes like this."),
-      FaqItem(question: "Is rent control a federal law?", answer: "No, rent control is decided state by state. Your state legislator is the right contact."),
+      FaqItem(question: "My landlord will not fix something — who handles that?", answer: "Local housing authorities, city offices, or tenant boards usually handle landlord-tenant issues; those are rarely federal matters."),
+      FaqItem(question: "Is rent control set by the federal government?", answer: "No. Rent control and many housing policies are decided at the state or local level, so your state lawmakers are often the right starting point."),
     ],
   ),
   IssueCategory(
@@ -39,8 +38,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "clinics", name: "Local clinics & hospital access", levels: ["county"], description: "County health department"),
     ],
     faqs: [
-      FaqItem(question: "Is Medicaid federal or state?", answer: "Both — it's federally funded but run by each state, so your state legislator is the right first contact for problems with it."),
-      FaqItem(question: "What about Medicare?", answer: "Medicare is fully federal, so your House rep or senators are the right contacts."),
+      FaqItem(question: "When should I contact my state legislators instead of Congress?", answer: "Programs like Medicaid and many local health services are managed by the state or county, even though the federal government helps fund them."),
+      FaqItem(question: "What is Medicare handled by?", answer: "Medicare is a federal program, so your U.S. House representative or senators are usually the best federal contacts."),
     ],
   ),
   IssueCategory(
@@ -52,8 +51,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "higher-ed", name: "Higher education policy", levels: ["federal_house", "federal_senate"], description: "Federal college funding and regulation"),
     ],
     faqs: [
-      FaqItem(question: "Who decides what my school teaches?", answer: "Curriculum is largely a state and local school board decision, not federal."),
-      FaqItem(question: "Who handles student loan policy?", answer: "Federal student aid programs are set by Congress, so your House rep and senators are the right contacts."),
+      FaqItem(question: "Who decides what schools teach?", answer: "Most curriculum and K-12 policy is set by state or local education leaders, not by Congress."),
+      FaqItem(question: "Who handles student loans?", answer: "Federal student aid is controlled by national policy, so your House rep and senators are usually the right federal contacts."),
     ],
   ),
   IssueCategory(
@@ -65,8 +64,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "gun-policy", name: "Gun policy", levels: ["state", "federal_house", "federal_senate"], description: "State and federal gun laws"),
     ],
     faqs: [
-      FaqItem(question: "Who oversees my local police department?", answer: "That's handled at the city or county level, usually through a city council or civilian oversight board."),
-      FaqItem(question: "Is gun policy federal or state?", answer: "Both — some gun laws are federal, but many restrictions are set state by state, so this issue often needs contacting both levels."),
+      FaqItem(question: "Who investigates local police concerns?", answer: "Most local complaints are handled by city or county officials, oversight boards, or the local police department itself, not by a federal office."),
+      FaqItem(question: "Why can gun policy involve multiple levels of government?", answer: "Some gun laws are federal, while others are set by a state. A local issue may require both state and federal contacts depending on the concern."),
     ],
   ),
   IssueCategory(
@@ -78,7 +77,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "waste", name: "Local waste & recycling", levels: ["county"], description: "County or municipal waste management"),
     ],
     faqs: [
-      FaqItem(question: "Who handles recycling programs?", answer: "Waste and recycling are managed locally by your county or municipality."),
+      FaqItem(question: "Who handles trash or recycling complaints?", answer: "Those are usually local county or municipal services, not a congressional office."),
+      FaqItem(question: "When is it a state or federal environmental issue?", answer: "Broad changes in air, water, and climate policy are often federal or state issues, while waste pickup and local land use are usually local."),
     ],
   ),
   IssueCategory(
@@ -90,7 +90,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "property-tax", name: "Property tax", levels: ["county"], description: "County tax assessor"),
     ],
     faqs: [
-      FaqItem(question: "Who sets my property tax rate?", answer: "Property taxes are assessed and collected at the county level."),
+      FaqItem(question: "Who sets my property taxes?", answer: "Property tax is usually determined at the county or local level through the assessor and local taxing agencies."),
+      FaqItem(question: "When should I contact a state or federal official about taxes?", answer: "Federal tax policy is national, while state income tax and property tax are typically handled by state and county offices."),
     ],
   ),
   IssueCategory(
@@ -100,7 +101,7 @@ final List<IssueCategory> issueTree = [
       Issue(id: "immigration-policy", name: "Immigration policy & enforcement", levels: ["federal_house", "federal_senate"], description: "Federal jurisdiction only"),
     ],
     faqs: [
-      FaqItem(question: "Can my state or city change immigration law?", answer: "No — immigration is exclusively federal jurisdiction, so your House rep and senators are the only correct contacts."),
+      FaqItem(question: "Can city or state offices decide immigration policy?", answer: "Not in the way Congress does. Immigration enforcement and policy are primarily federal responsibilities."),
     ],
   ),
   IssueCategory(
@@ -112,7 +113,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "unemployment", name: "Unemployment benefits", levels: ["state"], description: "State-administered unemployment insurance"),
     ],
     faqs: [
-      FaqItem(question: "Who sets minimum wage?", answer: "There's a federal minimum wage floor, but most states set their own higher minimum, so check both."),
+      FaqItem(question: "Who sets minimum wage rules?", answer: "There is a federal wage floor, but many states and local governments set higher minimums or additional workplace rules."),
+      FaqItem(question: "Who manages unemployment claims?", answer: "Most unemployment benefits are handled by the state, even if federal labor rules create the larger legal framework."),
     ],
   ),
   IssueCategory(
@@ -124,7 +126,8 @@ final List<IssueCategory> issueTree = [
       Issue(id: "local-election", name: "Local polling & county elections", levels: ["county"], description: "County board of elections"),
     ],
     faqs: [
-      FaqItem(question: "Who runs my local polling place?", answer: "Your county board of elections manages polling locations and local voting logistics."),
+      FaqItem(question: "Who runs polling places in my area?", answer: "Your county election office typically manages polling locations, voting logistics, and local election administration."),
+      FaqItem(question: "When is the issue federal versus state?", answer: "Federal law covers national voting rights and elections, while state and county offices handle local rules, ballot issues, and polling locations."),
     ],
   ),
   IssueCategory(
@@ -134,7 +137,7 @@ final List<IssueCategory> issueTree = [
       Issue(id: "ss-policy", name: "Social Security policy", levels: ["federal_house", "federal_senate"], description: "Federal retirement benefits program"),
     ],
     faqs: [
-      FaqItem(question: "Is Social Security ever handled at the state level?", answer: "No, it's entirely federal — your House rep and senators are the only correct contacts."),
+      FaqItem(question: "Is Social Security handled by local or state offices?", answer: "No. Social Security is a federal program, so congressional offices are the proper federal contacts for policy questions."),
     ],
   ),
   IssueCategory(
@@ -145,7 +148,7 @@ final List<IssueCategory> issueTree = [
       Issue(id: "state-land", name: "State land use law", levels: ["state"], description: "Broader state development regulation"),
     ],
     faqs: [
-      FaqItem(question: "Who approves new construction near me?", answer: "Local zoning boards, run by your city or county, handle building and land use approvals."),
+      FaqItem(question: "Who approves a new development or zoning change?", answer: "Local city or county zoning boards usually make those decisions, while state rules affect broader land use and development policy."),
     ],
   ),
 ];

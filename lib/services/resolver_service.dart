@@ -20,10 +20,15 @@ Future<LocationInfo> getCachedLocation(double lat, double lng) async {
   return location;
 }
 
-Future<List<Contact>> getContactsForIssue(String level, LocationInfo location) async {
+Future<List<Contact>> getContactsForIssue(String level, LocationInfo location, {String? issueId}) async {
   switch (level) {
     case 'federal_house':
-      return await fetchFederalReps(location.stateAbbr, location.congressionalDistrict);
+      // A House rep lookup is meaningless without a district — this is the
+      // one level that actually needs it. Fail soft (empty list, which the
+      // Results screen already shows a clear "no contacts found" state for)
+      // instead of calling the Congress API with a null/garbage value.
+      if (location.congressionalDistrict == null) return [];
+      return await fetchFederalReps(location.stateAbbr, location.congressionalDistrict!);
 
     case 'federal_senate':
       return await fetchSenators(location.stateAbbr);
@@ -32,7 +37,14 @@ Future<List<Contact>> getContactsForIssue(String level, LocationInfo location) a
       return await fetchStateLegislators(location.lat, location.lng);
 
     case 'county':
-      return countyDictionary[location.county] ?? [];
+      final all = countyDictionary[location.county] ?? [];
+      if (issueId == null) return all;
+      // A contact with no issueIds is a general/countywide office (County
+      // Executive, County Council, 311) and shows for every county issue.
+      // One with issueIds only shows when it actually matches — this is what
+      // stops something like "report a pothole" from also surfacing the
+      // Sheriff, State's Attorney, and Health Department.
+      return all.where((c) => c.issueIds.isEmpty || c.issueIds.contains(issueId)).toList();
 
     default:
       return [];
