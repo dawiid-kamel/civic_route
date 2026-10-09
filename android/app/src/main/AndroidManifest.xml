@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="civic_route"
+        android:label="Civic Route"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -42,5 +42,9 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
+    <!-- Release builds have no network without INTERNET (debug adds it automatically). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 12+ lets people share approximate location only, so ask for both. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 </manifest>

@@ -1,43 +1,75 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'env_loader.dart';
-import '../../models/contact.dart';
+/// State legislator lookup via the Open States API (through the API relay).
+///
+/// `fetchStateLegislators` takes the user's coordinates and returns the state
+/// senator and representative as `Contact`s; `parseStateLegislators` is the
+/// pure parsing step (kept separate so it can be unit tested).
+/// `resolver_service.dart` calls it for the `state` level. Phone numbers and
+/// office addresses come from Open States' `offices` data when it has them.
+/// For Maryland, a contact with no website falls back to the General Assembly's
+/// member directory so there is always somewhere to go.
+library;
+
+import '../models/contact.dart';
+import 'api_client.dart';
+
+const _marylandDirectory = 'https://mgaleg.maryland.gov/mgawebsite/Members/Index';
 
 Future<List<Contact>> fetchStateLegislators(double lat, double lng) async {
-  final apiKey = appEnv['OPENSTATES_API_KEY'];
-  final url = Uri.parse(
-    'https://v3.openstates.org/people.geo?lat=$lat&lng=$lng&apikey=$apiKey'
+  final data = await getJson(
+    relayUri('openstates/people.geo', {
+      'lat': lat.toString(),
+      'lng': lng.toString(),
+      'include': 'offices',
+    }),
+    service: 'Open States',
   );
+  return parseStateLegislators(data);
+}
 
-  final response = await http.get(url);
-  if (response.statusCode != 200) {
-    throw Exception('OpenStates API failed: ${response.statusCode}');
-  }
+/// Turns an Open States `people.geo` response into state-level contacts.
+List<Contact> parseStateLegislators(dynamic data) {
+  final results = (data is Map ? data['results'] as List? : null) ?? const [];
 
-  final data = jsonDecode(response.body);
-  final results = data['results'] as List;
+  // This endpoint also returns federal reps/senators; keep only state-level people.
+  final stateOnly = results.where((p) => p is Map && p['jurisdiction']?['classification'] == 'state');
 
-  // keep only state-level people — this endpoint also returns federal reps/senators
-  final stateOnly = results.where((p) {
-    return p['jurisdiction']?['classification'] == 'state';
-  }).toList();
-
-  return stateOnly.map((p) {
+  return stateOnly.map<Contact>((p) {
     final role = p['current_role'];
-    // OpenStates' `email` field is sometimes a real mailto address and
-    // sometimes a contact-form link. The UI's "Website" button assumes an
-    // http(s) URL it can launch, so only pass it through when it actually
-    // looks like one — otherwise leave website null rather than handing the
-    // button a broken link.
-    final rawContact = p['email']?.toString();
-    final website = (rawContact != null && rawContact.startsWith('http'))
-        ? rawContact
-        : null;
+
+    // Open States' `email` is sometimes a real address and sometimes a
+    // contact-form link. Links go to `website`, real addresses to `email`.
+    final rawContact = p['email']?.toString().trim();
+    String? website;
+    String? email;
+    if (rawContact != null && rawContact.startsWith('http')) {
+      website = rawContact;
+    } else if (rawContact != null && rawContact.contains('@')) {
+      email = rawContact;
+    }
+    if (website == null && p['jurisdiction']?['name'] == 'Maryland') {
+      website = _marylandDirectory;
+    }
+
+    String? phone;
+    String? address;
+    final offices = p['offices'];
+    if (offices is List) {
+      for (final o in offices) {
+        if (o is! Map) continue;
+        final voice = o['voice']?.toString().trim();
+        if (phone == null && voice != null && voice.isNotEmpty) phone = voice;
+        final addr = o['address']?.toString().trim();
+        if (address == null && addr != null && addr.isNotEmpty) address = addr;
+      }
+    }
+
     return Contact(
-      name: p['name'] ?? 'Unknown',
-      office: role?['title'] ?? 'State Legislator',
-      phone: null, // not available from this endpoint
+      name: p['name']?.toString() ?? 'Unknown',
+      office: role?['title']?.toString() ?? 'State Legislator',
+      phone: phone,
+      email: email,
       website: website,
+      address: address,
       level: 'state',
     );
   }).toList();

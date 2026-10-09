@@ -1,3 +1,13 @@
+/// Shared colors and gradient for the whole app.
+///
+/// `AppColors.of(context)` returns the light or dark palette to match the
+/// system theme; every content screen (Category, Results, Resident hub,
+/// Onboarding) reads its colors from here so the app stays consistent.
+/// `main.dart` also uses these values to build its `ThemeData`. The fixed
+/// `AppGradients.background` is the branded backdrop behind the Home,
+/// Onboarding and Tutorial screens.
+library;
+
 import 'package:flutter/material.dart';
 
 /// Theme-aware brand palette.

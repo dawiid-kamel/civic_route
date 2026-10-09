@@ -1,6 +1,12 @@
+/// First-launch walkthrough (three swipeable pages).
+///
+/// Shown once; finishing or skipping saves `tutorial_seen` and moves on to
+/// `OnboardingScreen`. `main.dart` decides whether to show this screen.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../theme.dart';
+import '../theme.dart';
 import 'onboarding_screen.dart';
 
 class TutorialScreen extends StatefulWidget {
@@ -18,6 +24,12 @@ class _TutorialPage {
 class _TutorialScreenState extends State<TutorialScreen> {
   final controller = PageController();
   int page = 0;
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +117,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
   void _finish() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('tutorial_seen', true);
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OnboardingScreen()));
   }
 }

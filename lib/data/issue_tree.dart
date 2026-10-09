@@ -1,3 +1,12 @@
+/// Static catalog of issue categories and sub-issues.
+///
+/// This is the content behind the Home grid, the Category screen and the
+/// search box. Each sub-issue lists the government `levels` responsible for
+/// it (`federal_house`, `federal_senate`, `state`, `county`); the resolver
+/// uses those to choose which lookups to run, and the Resident hub reads it to
+/// show the names of saved categories and issues.
+library;
+
 import 'package:flutter/material.dart';
 import '../models/issue.dart';
 
@@ -11,10 +20,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "local-roads", name: "Local roads & potholes", levels: ["county"], description: "City or county public works"),
       Issue(id: "airports", name: "Airports", levels: ["federal_house", "federal_senate"], description: "FAA and federal aviation policy"),
     ],
-    faqs: [
-      FaqItem(question: "Who should I contact for a pothole or street repair?", answer: "Most road repairs are handled by your city or county public works office. Federal offices usually handle interstate or highway funding, not local potholes."),
-      FaqItem(question: "Why do I sometimes need a state office instead of a federal one?", answer: "Public transit and bus service are often run by regional agencies and funded through state policy, while interstates and airports are usually federal."),
-    ],
+    guide: CategoryGuide(
+      covers: "Roads, highways, public transit, and airports.",
+      federal: "Interstate highways and airports, including funding and FAA rules.",
+      state: "Public transit funding and regional bus and rail service.",
+      county: "Local roads, potholes, sidewalks, and snow removal.",
+      prepare: "The street or intersection, what the problem is, when you noticed it, and photos if you have them.",
+    ),
   ),
   IssueCategory(
     id: "housing", name: "Housing", icon: Icons.home_outlined,
@@ -24,10 +36,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "hud", name: "Federal housing policy (HUD)", levels: ["federal_house", "federal_senate"], description: "National housing programs and funding"),
       Issue(id: "rent-control", name: "Rent control & state housing law", levels: ["state"], description: "State legislature housing regulations"),
     ],
-    faqs: [
-      FaqItem(question: "My landlord will not fix something — who handles that?", answer: "Local housing authorities, city offices, or tenant boards usually handle landlord-tenant issues; those are rarely federal matters."),
-      FaqItem(question: "Is rent control set by the federal government?", answer: "No. Rent control and many housing policies are decided at the state or local level, so your state lawmakers are often the right starting point."),
-    ],
+    guide: CategoryGuide(
+      covers: "Renting, landlord and tenant problems, and housing programs.",
+      federal: "National housing programs and funding (HUD). Rent control is not set federally.",
+      state: "State housing law, including rules on rent increases and tenant rights.",
+      county: "Local housing offices and tenant complaints.",
+      prepare: "Your lease, the dates you asked the landlord for help, photos of the problem, and any notices you received.",
+    ),
   ),
   IssueCategory(
     id: "healthcare", name: "Healthcare", icon: Icons.medical_services_outlined,
@@ -37,10 +52,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "medicare", name: "Medicare", levels: ["federal_house", "federal_senate"], description: "Federal health program for seniors"),
       Issue(id: "clinics", name: "Local clinics & hospital access", levels: ["county"], description: "County health department"),
     ],
-    faqs: [
-      FaqItem(question: "When should I contact my state legislators instead of Congress?", answer: "Programs like Medicaid and many local health services are managed by the state or county, even though the federal government helps fund them."),
-      FaqItem(question: "What is Medicare handled by?", answer: "Medicare is a federal program, so your U.S. House representative or senators are usually the best federal contacts."),
-    ],
+    guide: CategoryGuide(
+      covers: "Health coverage programs and access to local care.",
+      federal: "Medicare, the federal health program for seniors.",
+      state: "Medicaid, which states run with federal funding.",
+      county: "The county health department and local clinics.",
+      prepare: "Your insurance or program ID, the name of the provider or clinic, and the dates of any denied claims or services.",
+    ),
   ),
   IssueCategory(
     id: "education", name: "Education", icon: Icons.school_outlined,
@@ -50,10 +68,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "student-loans", name: "Student loans", levels: ["federal_house", "federal_senate"], description: "Federal student aid policy"),
       Issue(id: "higher-ed", name: "Higher education policy", levels: ["federal_house", "federal_senate"], description: "Federal college funding and regulation"),
     ],
-    faqs: [
-      FaqItem(question: "Who decides what schools teach?", answer: "Most curriculum and K-12 policy is set by state or local education leaders, not by Congress."),
-      FaqItem(question: "Who handles student loans?", answer: "Federal student aid is controlled by national policy, so your House rep and senators are usually the right federal contacts."),
-    ],
+    guide: CategoryGuide(
+      covers: "Schools, student loans, and college policy.",
+      federal: "Student loans and federal college funding and rules.",
+      state: "State education policy, school funding, and curriculum standards.",
+      county: "Your local school board and school system.",
+      prepare: "The school or district name, the grade or program involved, and any emails or letters you have already exchanged.",
+    ),
   ),
   IssueCategory(
     id: "public-safety", name: "Public Safety", icon: Icons.shield_outlined,
@@ -63,10 +84,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "federal-le", name: "Federal law enforcement", levels: ["federal_house", "federal_senate"], description: "FBI, DOJ, federal crime policy"),
       Issue(id: "gun-policy", name: "Gun policy", levels: ["state", "federal_house", "federal_senate"], description: "State and federal gun laws"),
     ],
-    faqs: [
-      FaqItem(question: "Who investigates local police concerns?", answer: "Most local complaints are handled by city or county officials, oversight boards, or the local police department itself, not by a federal office."),
-      FaqItem(question: "Why can gun policy involve multiple levels of government?", answer: "Some gun laws are federal, while others are set by a state. A local issue may require both state and federal contacts depending on the concern."),
-    ],
+    guide: CategoryGuide(
+      covers: "Policing, law enforcement, and gun laws. In an emergency, call 911.",
+      federal: "Federal law enforcement (FBI, DOJ) and federal gun laws.",
+      state: "State gun laws.",
+      county: "Local police conduct and oversight.",
+      prepare: "The date, time, and place of the incident, any officer or case numbers, and the names of witnesses.",
+    ),
   ),
   IssueCategory(
     id: "environment", name: "Environment", icon: Icons.eco_outlined,
@@ -76,10 +100,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "state-env", name: "State environmental law", levels: ["state"], description: "State-level emissions and land use rules"),
       Issue(id: "waste", name: "Local waste & recycling", levels: ["county"], description: "County or municipal waste management"),
     ],
-    faqs: [
-      FaqItem(question: "Who handles trash or recycling complaints?", answer: "Those are usually local county or municipal services, not a congressional office."),
-      FaqItem(question: "When is it a state or federal environmental issue?", answer: "Broad changes in air, water, and climate policy are often federal or state issues, while waste pickup and local land use are usually local."),
-    ],
+    guide: CategoryGuide(
+      covers: "Climate, pollution, and waste.",
+      federal: "National climate and environmental regulation.",
+      state: "State rules on emissions and land use.",
+      county: "Trash, recycling, and other local waste services.",
+      prepare: "The address or location, what you saw and when, and photos if possible.",
+    ),
   ),
   IssueCategory(
     id: "taxes", name: "Taxes", icon: Icons.payments_outlined,
@@ -89,10 +116,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "state-tax", name: "State income tax", levels: ["state"], description: "State tax legislation"),
       Issue(id: "property-tax", name: "Property tax", levels: ["county"], description: "County tax assessor"),
     ],
-    faqs: [
-      FaqItem(question: "Who sets my property taxes?", answer: "Property tax is usually determined at the county or local level through the assessor and local taxing agencies."),
-      FaqItem(question: "When should I contact a state or federal official about taxes?", answer: "Federal tax policy is national, while state income tax and property tax are typically handled by state and county offices."),
-    ],
+    guide: CategoryGuide(
+      covers: "Income taxes and property taxes.",
+      federal: "Federal income tax policy.",
+      state: "State income tax laws.",
+      county: "Property tax bills and assessment questions.",
+      prepare: "Your tax bill or notice, your property or account number, and the tax year in question.",
+    ),
   ),
   IssueCategory(
     id: "immigration", name: "Immigration", icon: Icons.public_outlined,
@@ -100,9 +130,13 @@ final List<IssueCategory> issueTree = [
     subIssues: [
       Issue(id: "immigration-policy", name: "Immigration policy & enforcement", levels: ["federal_house", "federal_senate"], description: "Federal jurisdiction only"),
     ],
-    faqs: [
-      FaqItem(question: "Can city or state offices decide immigration policy?", answer: "Not in the way Congress does. Immigration enforcement and policy are primarily federal responsibilities."),
-    ],
+    guide: CategoryGuide(
+      covers: "Immigration law and enforcement.",
+      federal: "All immigration policy and enforcement.",
+      state: null,
+      county: null,
+      prepare: "Your case or receipt number, the relevant dates, and copies of any notices or letters.",
+    ),
   ),
   IssueCategory(
     id: "labor", name: "Employment & Labor", icon: Icons.work_outline,
@@ -112,10 +146,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "state-wage", name: "State minimum wage & workplace law", levels: ["state"], description: "State labor legislation"),
       Issue(id: "unemployment", name: "Unemployment benefits", levels: ["state"], description: "State-administered unemployment insurance"),
     ],
-    faqs: [
-      FaqItem(question: "Who sets minimum wage rules?", answer: "There is a federal wage floor, but many states and local governments set higher minimums or additional workplace rules."),
-      FaqItem(question: "Who manages unemployment claims?", answer: "Most unemployment benefits are handled by the state, even if federal labor rules create the larger legal framework."),
-    ],
+    guide: CategoryGuide(
+      covers: "Wages, workplace rules, and unemployment benefits.",
+      federal: "The federal wage floor, overtime, and labor law.",
+      state: "State minimum wage, workplace law, and unemployment insurance.",
+      county: null,
+      prepare: "Your employer's name, your pay stubs, the dates you worked, and any written notices.",
+    ),
   ),
   IssueCategory(
     id: "elections", name: "Elections & Voting", icon: Icons.how_to_vote_outlined,
@@ -125,10 +162,13 @@ final List<IssueCategory> issueTree = [
       Issue(id: "state-election", name: "State election administration", levels: ["state"], description: "State voting rules and district maps"),
       Issue(id: "local-election", name: "Local polling & county elections", levels: ["county"], description: "County board of elections"),
     ],
-    faqs: [
-      FaqItem(question: "Who runs polling places in my area?", answer: "Your county election office typically manages polling locations, voting logistics, and local election administration."),
-      FaqItem(question: "When is the issue federal versus state?", answer: "Federal law covers national voting rights and elections, while state and county offices handle local rules, ballot issues, and polling locations."),
-    ],
+    guide: CategoryGuide(
+      covers: "Voting rights, voter registration, and polling places.",
+      federal: "National voting-rights and election law.",
+      state: "State election rules and district maps.",
+      county: "Voter registration, polling places, and local election administration.",
+      prepare: "Your name and address as registered, the election date, and the polling place involved.",
+    ),
   ),
   IssueCategory(
     id: "social-security", name: "Social Security", icon: Icons.people_outline,
@@ -136,9 +176,13 @@ final List<IssueCategory> issueTree = [
     subIssues: [
       Issue(id: "ss-policy", name: "Social Security policy", levels: ["federal_house", "federal_senate"], description: "Federal retirement benefits program"),
     ],
-    faqs: [
-      FaqItem(question: "Is Social Security handled by local or state offices?", answer: "No. Social Security is a federal program, so congressional offices are the proper federal contacts for policy questions."),
-    ],
+    guide: CategoryGuide(
+      covers: "Retirement and other Social Security benefits.",
+      federal: "All Social Security policy and benefits.",
+      state: null,
+      county: null,
+      prepare: "Your claim or case number (not your full Social Security number), the relevant dates, and any letters you received.",
+    ),
   ),
   IssueCategory(
     id: "zoning", name: "Zoning & Development", icon: Icons.business_outlined,
@@ -147,8 +191,30 @@ final List<IssueCategory> issueTree = [
       Issue(id: "local-zoning", name: "Local zoning decisions", levels: ["county"], description: "County or city zoning board"),
       Issue(id: "state-land", name: "State land use law", levels: ["state"], description: "Broader state development regulation"),
     ],
-    faqs: [
-      FaqItem(question: "Who approves a new development or zoning change?", answer: "Local city or county zoning boards usually make those decisions, while state rules affect broader land use and development policy."),
-    ],
+    guide: CategoryGuide(
+      covers: "Land use, building, and development approvals.",
+      federal: null,
+      state: "State land-use and development rules.",
+      county: "Zoning boards and permits for local building and development.",
+      prepare: "The property address, the project or change in question, and any permit or case numbers.",
+    ),
   ),
 ];
+
+/// Finds a category by id, or null if it no longer exists in the catalog.
+IssueCategory? findCategoryById(String id) {
+  for (final c in issueTree) {
+    if (c.id == id) return c;
+  }
+  return null;
+}
+
+/// Finds a sub-issue by id, or null if it no longer exists in the catalog.
+Issue? findIssueById(String id) {
+  for (final c in issueTree) {
+    for (final i in c.subIssues) {
+      if (i.id == id) return i;
+    }
+  }
+  return null;
+}

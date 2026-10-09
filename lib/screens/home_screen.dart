@@ -1,14 +1,28 @@
+/// Main screen: search, issue categories, dashboard and local alerts.
+///
+/// Shows the current county/state, a searchable grid of issue categories
+/// from `data/issue_tree.dart` (opens `CategoryScreen`), a "Saved topics" list
+/// for quick access to bookmarked categories and issues, service shortcuts
+/// (opens `ResidentHubScreen`) and a "Local alerts" section that shows
+/// "No new events found" until a real feed is connected.
+library;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../data/issue_tree.dart';
-import '../../data/services_data.dart';
-import '../../models/issue.dart';
-import '../../services/device_location_service.dart';
-import '../../services/resolver_service.dart';
-import '../../theme.dart';
-import '../../widgets/glass.dart';
+import '../config.dart';
+import '../data/issue_tree.dart';
+import '../data/services_data.dart';
+import '../models/issue.dart';
+import '../services/device_location_service.dart';
+import '../services/resolver_service.dart';
+import '../theme.dart';
+import '../widgets/address_dialog.dart';
+import '../widgets/glass.dart';
 import 'category_screen.dart';
+import 'results_screen.dart';
 import 'resident_hub_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,8 +34,11 @@ class _HomeScreenState extends State<HomeScreen> {
   String locationLabel = 'Your location';
   final TextEditingController _searchController = TextEditingController();
   List<String> savedCategories = [];
+  List<String> savedIssues = [];
   List<String> recentCategories = [];
   bool alertsEnabled = true;
+  // Shown when the user's county has no hand-checked local offices yet.
+  String? coverageNote;
 
   @override
   void initState() {
@@ -41,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() {
       savedCategories = prefs.getStringList('saved_categories') ?? [];
+      savedIssues = prefs.getStringList('saved_issues') ?? [];
       recentCategories = prefs.getStringList('recent_categories') ?? [];
       // Local alerts used to always render regardless of this setting, even
       // though the resident hub's "Local alerts" switch implied it controlled
@@ -61,6 +79,21 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setStringList('saved_categories', updated);
   }
 
+  // Saving an issue happens two screens deep (Results), so reload the saved
+  // lists whenever we come back to Home.
+  void _openCategory(IssueCategory cat) {
+    _trackRecent(cat.id);
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => CategoryScreen(category: cat)))
+        .then((_) => _loadSavedState());
+  }
+
+  void _openIssue(Issue issue) {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => ResultsScreen(issue: issue)))
+        .then((_) => _loadSavedState());
+  }
+
   Future<void> _trackRecent(String categoryId) async {
     final prefs = await SharedPreferences.getInstance();
     final updated = List<String>.from(recentCategories);
@@ -77,30 +110,82 @@ class _HomeScreenState extends State<HomeScreen> {
       double? lat = prefs.getDouble('lat');
       double? lng = prefs.getDouble('lng');
 
-      try {
-        final position = await getDeviceLocation();
-        lat = position.latitude;
-        lng = position.longitude;
-        await prefs.setDouble('lat', lat);
-        await prefs.setDouble('lng', lng);
-      } catch (_) {
-        // Use the last known position if location services are unavailable.
+      // A typed-in address is the user's choice; don't replace it with GPS.
+      if (prefs.getString('location_source') != 'address') {
+        try {
+          final position = await getDeviceLocation();
+          lat = position.latitude;
+          lng = position.longitude;
+          await prefs.setDouble('lat', lat);
+          await prefs.setDouble('lng', lng);
+          await prefs.setString('location_source', 'gps');
+        } catch (e) {
+          // Use the last known position if location services are unavailable.
+          debugPrint('Device location unavailable, using last saved position: $e');
+        }
       }
 
       if (lat == null || lng == null) return;
 
       final location = await getCachedLocation(lat, lng);
       if (mounted) {
-        setState(() => locationLabel = '${location.county}, ${location.state}');
+        setState(() {
+          locationLabel = '${location.county}, ${location.state}';
+          coverageNote = hasCountyDirectory(location)
+              ? null
+              : "Local offices for ${location.county}, ${location.stateAbbr} aren't built in yet. "
+                  'Federal and state officials still work here; full local coverage is in Baltimore County, MD.';
+        });
       }
-    } catch (_) {
-      // Keep the generic label when reverse geocoding is unavailable.
+    } catch (e) {
+      // Keep the generic label when the location can't be looked up (offline, etc.).
+      debugPrint('Home location lookup failed: $e');
     }
   }
 
-  // "Change area" used to just pop a snackbar and do nothing else — it never
-  // actually looked at the device's current position again. Now it does.
-  Future<void> _refreshLocation() async {
+  /// "Change area": use the device location again, or type an address.
+  Future<void> _changeArea() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFF16345C),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Change your area', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+              SizedBox(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.my_location, color: Colors.white),
+                title: Text('Use my current location', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                onTap: () => Navigator.pop(context, 'gps'),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.edit_location_alt_outlined, color: Colors.white),
+                title: Text('Enter an address', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                onTap: () => Navigator.pop(context, 'address'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+
+    if (choice == 'address') {
+      final saved = await promptForAddress(context);
+      if (!saved || !mounted) return;
+      await _loadLocation();
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('location_source', 'gps');
     await _loadLocation();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -145,10 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: Text(cat.name, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   onTap: () {
                     Navigator.pop(context);
-                    _trackRecent(cat.id);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => CategoryScreen(category: cat)),
-                    );
+                    _openCategory(cat);
                   },
                 ),
               ),
@@ -167,6 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
         category.name,
         category.description,
         ...category.subIssues.map((issue) => issue.name),
+        ...category.subIssues.map((issue) => issue.description),
       ].join(' ').toLowerCase();
       return haystack.contains(query);
     }).toList();
@@ -190,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final dashboardCards = [
       _DashboardCard(
         label: 'Saved',
-        value: '${savedCategories.length}',
+        value: '${savedCategories.length + savedIssues.length}',
         icon: Icons.bookmark_outline,
       ),
       _DashboardCard(
@@ -209,27 +292,29 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ];
 
-    final alerts = [
-      _AlertCard(
-        title: 'Town hall',
-        body: 'Public meeting this Thursday at 6:30 PM.',
-        icon: Icons.campaign_outlined,
-      ),
-      _AlertCard(
-        title: 'Road work',
-        body: 'Lane closure on 7th Street through Friday.',
-        icon: Icons.construction_outlined,
-      ),
-    ];
+    // Stub: no live events/alerts feed is connected yet. These used to be two
+    // hard-coded fake alerts ("Town hall", "Road work") that showed for every
+    // user. Until a real source exists, the list stays empty and the section
+    // shows a "No new events found" message instead.
+    final List<_AlertCard> alerts = <_AlertCard>[];
 
+    // The old layout wrapped the scroll view in a SafeArea, which clipped the
+    // category cards in a hard line at the status bar and home indicator. The
+    // scroll view now fills the whole screen and the safe-area insets are
+    // added as padding *inside* it, so content scrolls out smoothly. The
+    // status bar icons are forced light because the gradient behind them is dark.
+    final safe = MediaQuery.of(context).padding;
     return Scaffold(
-      body: Container(
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light,
+        child: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(gradient: AppGradients.background),
-        child: SafeArea(
-          child: CustomScrollView(
+        child: CustomScrollView(
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                padding: EdgeInsets.fromLTRB(20, safe.top + 12, 20, 8),
                 sliver: SliverToBoxAdapter(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       SizedBox(height: 6),
                       Text(
-                        "Tap a category to route it, or tap (i) to learn what it covers.",
+                        "Tap a category to see who handles it. Tap the bookmark to save it.",
                         style: TextStyle(
                           fontSize: 15,
                           color: Colors.white70,
@@ -316,51 +401,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
                 sliver: SliverToBoxAdapter(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children:
-                        [
-                          'Pothole',
-                          'Housing',
-                          'Transit',
-                          'School',
-                          'Taxes',
-                        ].map((label) {
-                          return Semantics(
-                            button: true,
-                            label: 'Search for $label',
-                            child: GestureDetector(
-                              onTap: () {
-                                _searchController.text = label;
-                                setState(() {});
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                  ),
-                                ),
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (coverageNote != null) _coverageNoteCard(),
+                      _savedTopicsSection(),
+                    ],
                   ),
                 ),
               ),
@@ -380,9 +428,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       SizedBox(height: 12),
                       Row(
-                        children: dashboardCards
-                            .map((card) => Expanded(child: card))
-                            .toList(),
+                        children: [
+                          for (var i = 0; i < dashboardCards.length; i++) ...[
+                            if (i > 0) SizedBox(width: 8),
+                            Expanded(child: dashboardCards[i]),
+                          ],
+                        ],
                       ),
                       SizedBox(height: 12),
                       Container(
@@ -427,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             TextButton(
-                              onPressed: _refreshLocation,
+                              onPressed: _changeArea,
                               child: Text(
                                 'Change area',
                                 style: TextStyle(
@@ -490,7 +541,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              if (alertsEnabled)
+              if (AppConfig.enableLocalAlerts && alertsEnabled)
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   sliver: SliverToBoxAdapter(
@@ -506,18 +557,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         SizedBox(height: 10),
-                        ...alerts.map(
-                          (alert) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: alert,
+                        if (alerts.isEmpty)
+                          const _EmptyAlertsCard()
+                        else
+                          ...alerts.map(
+                            (alert) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: alert,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
                 ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 32 + safe.bottom),
                 sliver: filteredCategories.isEmpty
                     ? SliverToBoxAdapter(
                         child: GlassContainer(
@@ -546,7 +600,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             cat: cat,
                             saved: savedCategories.contains(cat.id),
                             onToggleSave: () => _toggleSaved(cat.id),
-                            onOpen: () => _trackRecent(cat.id),
+                            onOpen: () => _openCategory(cat),
                           );
                         }, childCount: filteredCategories.length),
                       ),
@@ -555,6 +609,132 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _coverageNoteCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: Colors.white, size: 18),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              coverageNote!,
+              style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// "Saved topics": bookmarked categories and issues, one tap away.
+  Widget _savedTopicsSection() {
+    final cats = savedCategories
+        .map(findCategoryById)
+        .whereType<IssueCategory>()
+        .toList();
+    final issues = savedIssues
+        .map(findIssueById)
+        .whereType<Issue>()
+        .toList();
+
+    Widget row(IconData icon, String title, String kind, VoidCallback onTap) {
+      return Semantics(
+        button: true,
+        label: '$title, saved $kind',
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        kind,
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.white70),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Saved topics',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 10),
+        if (cats.isEmpty && issues.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.bookmark_border, color: Colors.white, size: 18),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No saved topics yet. Tap the bookmark on a category to keep it here.',
+                    style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          ...cats.map((c) => row(c.icon, c.name, 'Category', () => _openCategory(c))),
+          ...issues.map((i) => row(Icons.flag_outlined, i.name, 'Topic', () => _openIssue(i))),
+        ],
+      ],
     );
   }
 }
@@ -675,6 +855,57 @@ class _AlertCard extends StatelessWidget {
   }
 }
 
+/// Shown in the "Local alerts" section while no real alerts/events exist.
+class _EmptyAlertsCard extends StatelessWidget {
+  const _EmptyAlertsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'No new events found',
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.event_busy_outlined, color: Colors.white, size: 18),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No new events found',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Town halls, road work, and other local notices will show up here.',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DashboardCard extends StatelessWidget {
   final String label;
   final String value;
@@ -691,7 +922,6 @@ class _DashboardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = Container(
-      margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.12),
@@ -754,20 +984,6 @@ class _CategoryCard extends StatefulWidget {
 class _CategoryCardState extends State<_CategoryCard> {
   bool pressed = false;
 
-  // This used to open a separate bottom-sheet widget (_FaqSheet) that
-  // duplicated the same FAQ content CategoryScreen already shows inline as
-  // an expandable panel. Rather than maintaining the same data in two UI
-  // patterns, the info icon now opens CategoryScreen directly with that
-  // panel pre-expanded.
-  void _openInfo(BuildContext context) {
-    widget.onOpen();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CategoryScreen(category: widget.cat, startWithInfoOpen: true),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cat = widget.cat;
@@ -775,12 +991,7 @@ class _CategoryCardState extends State<_CategoryCard> {
       onTapDown: (_) => setState(() => pressed = true),
       onTapUp: (_) => setState(() => pressed = false),
       onTapCancel: () => setState(() => pressed = false),
-      onTap: () {
-        widget.onOpen();
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => CategoryScreen(category: cat)),
-        );
-      },
+      onTap: widget.onOpen,
       child: AnimatedScale(
         scale: pressed ? 0.96 : 1.0,
         duration: Duration(milliseconds: 100),
@@ -803,48 +1014,34 @@ class _CategoryCardState extends State<_CategoryCard> {
                     ),
                     child: Icon(cat.icon, color: Colors.white, size: 22),
                   ),
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          widget.onToggleSave();
-                        },
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            widget.saved
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      if (cat.faqs.isNotEmpty) ...[
-                        SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => _openInfo(context),
+                  // 44x44 tap target around a small visual circle (it used to
+                  // be only 26x26, which is hard to hit on a phone).
+                  Semantics(
+                    button: true,
+                    label: widget.saved ? 'Remove ${cat.name} from saved topics' : 'Save ${cat.name}',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onToggleSave,
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Center(
                           child: Container(
-                            width: 26,
-                            height: 26,
+                            width: 32,
+                            height: 32,
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              Icons.info_outline,
-                              size: 14,
+                              widget.saved ? Icons.bookmark : Icons.bookmark_border,
+                              size: 18,
                               color: Colors.white,
                             ),
                           ),
                         ),
-                      ],
-                    ],
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -1,9 +1,25 @@
+/// Shows who to contact for one sub-issue.
+///
+/// Resolves the saved location, asks `resolver_service.dart` for officials at
+/// each level the issue involves, and lists them with call/website buttons.
+/// A single "What to do next" card gives the recommended office, a short
+/// script and a Save button; a separate card tracks progress. Each idea
+/// appears once. Partial failures show the officials that loaded plus a notice,
+/// and when the phone is offline the last saved list is shown with its date
+/// (`services/results_cache.dart`). Counties with no hand-checked directory get
+/// a "not supported yet" card with fallback links (USA.gov, 211).
+library;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/issue.dart';
+import '../services/api_client.dart';
 import '../services/device_location_service.dart';
+import '../services/launcher.dart';
+import '../services/results_cache.dart';
+import '../util/format.dart';
 import '../models/contact.dart';
 import '../services/resolver_service.dart';
 import '../theme.dart';
@@ -20,16 +36,24 @@ class _ResultsScreenState extends State<ResultsScreen> {
   List<Contact> results = [];
   bool loading = true;
   String? error;
+  // Set when some (but not all) levels of government failed to load, so the
+  // user still sees the offices that did load plus a note about the rest.
+  String? partialWarning;
+  // Set when the list on screen is a saved copy because the phone is offline.
+  DateTime? offlineSavedAt;
+  // "County, ST" when we have no hand-checked county offices for the user's county.
+  String? unsupportedCounty;
   Set<String> favoriteContacts = {};
-  String currentStatus = 'Issue found';
+  String currentStatus = _statusSteps.first;
   bool issueSaved = false;
 
+  // Progress steps, in order. (These used to overlap with the "Save later" /
+  // "Follow up later" labels elsewhere on the screen.)
   static const List<String> _statusSteps = [
-    'Issue found',
-    'Representative identified',
-    'Action steps ready',
-    'Follow up later',
-    'I need help with this again',
+    'Not started',
+    'Contacted',
+    'Waiting for a response',
+    'Resolved',
   ];
 
   @override
@@ -39,12 +63,15 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedIds = prefs.getStringList('favorite_contact_ids') ?? [];
+    final savedIssues = prefs.getStringList('saved_issues') ?? [];
+    // Older versions stored different labels; anything unrecognized resets.
+    final storedStatus = prefs.getString('issue_status_${widget.issue.id}');
+    final savedStatus =
+        _statusSteps.contains(storedStatus) ? storedStatus! : _statusSteps.first;
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedIds = prefs.getStringList('favorite_contact_ids') ?? [];
-      final savedIssues = prefs.getStringList('saved_issues') ?? [];
-      final savedStatus =
-          prefs.getString('issue_status_${widget.issue.id}') ?? 'Issue found';
       var lat = prefs.getDouble('lat');
       var lng = prefs.getDouble('lng');
       if (lat == null || lng == null) {
@@ -55,25 +82,113 @@ class _ResultsScreenState extends State<ResultsScreen> {
         await prefs.setDouble('lng', lng);
       }
       final loc = await getCachedLocation(lat, lng);
-      List<Contact> all = [];
-      for (final level in widget.issue.levels) {
-        all.addAll(await getContactsForIssue(level, loc, issueId: widget.issue.id));
+
+      // Every level is looked up at the same time. One failing lookup (e.g.
+      // Open States down) must not hide the others, including local ones.
+      final failedLevels = <String>{};
+      Object? firstError;
+      final lists = await Future.wait(widget.issue.levels.map((level) async {
+        try {
+          return await getContactsForIssue(level, loc, issueId: widget.issue.id);
+        } catch (e) {
+          firstError ??= e;
+          failedLevels.add(_levelName(level));
+          return <Contact>[];
+        }
+      }));
+      final all = lists.expand((l) => l).toList();
+      final allLevels = widget.issue.levels.map(_levelName).toSet();
+      if (all.isEmpty && failedLevels.length == allLevels.length && firstError != null) {
+        throw firstError!;
       }
-      if (mounted)
-        setState(() {
-          results = all;
-          favoriteContacts = savedIds.toSet();
-          issueSaved = savedIssues.contains(widget.issue.id);
-          currentStatus = savedStatus;
-          loading = false;
-        });
+      if (all.isNotEmpty) await saveCachedResults(widget.issue.id, all);
+
+      if (!mounted) return;
+      setState(() {
+        partialWarning = failedLevels.isEmpty
+            ? null
+            : "Couldn't load ${failedLevels.join(' and ')} officials right now. Showing the rest.";
+        unsupportedCounty =
+            widget.issue.levels.contains('county') && !hasCountyDirectory(loc)
+                ? '${loc.county}, ${loc.state}'
+                : null;
+        offlineSavedAt = null;
+        results = all;
+        favoriteContacts = savedIds.toSet();
+        issueSaved = savedIssues.contains(widget.issue.id);
+        currentStatus = savedStatus;
+        loading = false;
+      });
     } catch (e) {
-      if (mounted)
+      // Offline: show the last list we saved for this issue, if there is one.
+      if (e is OfflineException) {
+        final cached = await loadCachedResults(widget.issue.id);
+        if (cached != null && mounted) {
+          setState(() {
+            results = cached.contacts;
+            offlineSavedAt = cached.savedAt;
+            favoriteContacts = savedIds.toSet();
+            issueSaved = savedIssues.contains(widget.issue.id);
+            currentStatus = savedStatus;
+            loading = false;
+          });
+          return;
+        }
+      }
+      debugPrint('Results load failed: $e');
+      if (mounted) {
         setState(() {
-          error = e.toString();
+          error = _friendlyError(e);
           loading = false;
         });
+      }
     }
+  }
+
+  String _levelName(String level) => level.contains('federal')
+      ? 'federal'
+      : level == 'state'
+          ? 'state'
+          : 'county';
+
+  /// Only messages written for users reach the screen; anything unexpected
+  /// gets a generic line (the details are logged with debugPrint).
+  String _friendlyError(Object e) {
+    if (e is AppException) return e.toString();
+    final text = e.toString();
+    if (text.contains('permission') || text.contains('Location services')) {
+      return 'We need your location to find your officials. Turn on location access, or enter an address from the Resident hub, and try again.';
+    }
+    return 'Something went wrong while looking up your officials. Please try again.';
+  }
+
+  Future<void> _copy(String text, String message) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String get _callScript =>
+      'Hello, I am calling about ${widget.issue.name.toLowerCase()}. '
+      'Can you tell me the next steps and which office handles this? '
+      'I have my dates, address and any case numbers ready.';
+
+  String get _emailTemplate =>
+      'Subject: Question about ${widget.issue.name}\n\n'
+      'Hello,\n\n'
+      'I am a resident writing about ${widget.issue.name.toLowerCase()}. '
+      'Could you tell me the next steps and which office handles this?\n\n'
+      'Details: [dates, address, case or account numbers]\n\n'
+      'Thank you,\n[Your name]\n[Your phone number]';
+
+  Future<void> _retry() async {
+    setState(() {
+      loading = true;
+      error = null;
+      partialWarning = null;
+      offlineSavedAt = null;
+    });
+    await _load();
   }
 
   String _contactKey(Contact contact) =>
@@ -129,9 +244,27 @@ class _ResultsScreenState extends State<ResultsScreen> {
           : error != null
           ? Padding(
               padding: const EdgeInsets.all(20),
-              child: Text(
-                'Error: $error',
-                style: TextStyle(color: colors.error),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, color: colors.error, size: 32),
+                  SizedBox(height: 12),
+                  Text(
+                    error!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: colors.textPrimary, height: 1.4),
+                  ),
+                  SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _retry,
+                    icon: Icon(Icons.refresh),
+                    label: Text('Try again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.accent,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             )
           : ListView(
@@ -139,16 +272,42 @@ class _ResultsScreenState extends State<ResultsScreen> {
               children: [
                 _summaryCard(colors),
                 _statusCard(colors),
-                if (results.isEmpty)
+                if (offlineSavedAt != null)
+                  _warningCard(
+                    colors,
+                    "You're offline. Showing the contacts saved on ${formatDate(offlineSavedAt!)}. They may have changed.",
+                  ),
+                if (partialWarning != null) _warningCard(colors, partialWarning!),
+                if (unsupportedCounty != null) _unsupportedCountyCard(colors, unsupportedCounty!),
+                if (results.isEmpty && unsupportedCounty == null)
                   _emptyResultsCard(colors)
                 else
-                  ...results.map((c) => _contactCard(c, colors)).toList(),
+                  ...results.map((c) => _contactCard(c, colors)),
+                _disclaimer(colors),
               ],
             ),
     );
   }
 
+  /// The offices that handle this issue, e.g. "federal and state".
+  String _levelsText() {
+    final names = widget.issue.levels.map(_levelName).toSet().toList();
+    if (names.length <= 1) return names.join();
+    return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+  }
+
+  /// Best office to start with: the one built for this exact issue if there
+  /// is one, otherwise the first result.
+  Contact? get _recommended {
+    if (results.isEmpty) return null;
+    return results.firstWhere(
+      (c) => c.issueIds.contains(widget.issue.id),
+      orElse: () => results.first,
+    );
+  }
+
   Widget _summaryCard(AppColors colors) {
+    final recommended = _recommended;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
@@ -176,61 +335,70 @@ class _ResultsScreenState extends State<ResultsScreen> {
           ),
           SizedBox(height: 12),
           Text(
-            'This issue usually involves ${widget.issue.levels.map((level) => level.contains('federal')
-                ? 'federal'
-                : level == 'state'
-                ? 'state'
-                : 'county').toSet().join(', ')} offices. Start with the office that matches the issue, bring dates or documents, and follow up after you call.',
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 13,
-              height: 1.5,
-            ),
+            'This is usually handled by ${_levelsText()} offices.',
+            style: TextStyle(color: colors.textPrimary, fontSize: 14, height: 1.5),
           ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: results.isEmpty
-                      ? null
-                      : () => ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Start with ${results.first.office}.',
-                            ),
-                          ),
-                        ),
-                  icon: Icon(Icons.arrow_forward, size: 16),
-                  label: Text('Recommended office'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.accent,
-                    foregroundColor: Colors.white,
+          if (recommended != null) ...[
+            SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.arrow_forward, color: colors.accent, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Start with ${recommended.name} (${recommended.office}).',
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4,
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ],
+          SizedBox(height: 14),
+          Text(
+            'What to say',
+            style: TextStyle(color: colors.accent, fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          SizedBox(height: 6),
+          Text(
+            '“I am calling about ${widget.issue.name.toLowerCase()}. Can you tell me the next steps and who handles this?”',
+            style: TextStyle(color: colors.textPrimary, fontSize: 14, height: 1.5),
+          ),
+          SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              TextButton.icon(
+                onPressed: () => _copy(_callScript, 'Call script copied'),
+                icon: Icon(Icons.copy, size: 16),
+                label: Text('Copy call script'),
               ),
-              SizedBox(width: 8),
-              IconButton(
-                onPressed: _toggleIssueSaved,
-                icon: Icon(
-                  issueSaved ? Icons.bookmark : Icons.bookmark_border,
-                  color: colors.accent,
-                ),
-                tooltip: issueSaved
-                    ? 'Remove saved issue'
-                    : 'Save issue for follow-up',
+              TextButton.icon(
+                onPressed: () => _copy(_emailTemplate, 'Email template copied'),
+                icon: Icon(Icons.mail_outline, size: 16),
+                label: Text('Copy email'),
               ),
             ],
           ),
-          SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _pill('Call first', colors),
-              _pill('Bring dates', colors),
-              _pill(issueSaved ? 'Saved for follow-up' : 'Save later', colors),
-            ],
+          SizedBox(height: 6),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _toggleIssueSaved,
+              icon: Icon(issueSaved ? Icons.bookmark : Icons.bookmark_border, size: 18),
+              label: Text(issueSaved ? 'Saved to your topics' : 'Save this topic'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: Size.fromHeight(46),
+                foregroundColor: colors.accent,
+                side: BorderSide(color: colors.accent),
+              ),
+            ),
           ),
         ],
       ),
@@ -250,7 +418,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Track this issue',
+            'Track your progress',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
@@ -268,6 +436,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 selected: active,
                 onSelected: (_) => _setStatus(status),
                 selectedColor: colors.accent,
+                checkmarkColor: Colors.white,
                 backgroundColor: colors.surface,
                 labelStyle: TextStyle(
                   color: active ? Colors.white : colors.textPrimary,
@@ -276,10 +445,92 @@ class _ResultsScreenState extends State<ResultsScreen> {
               );
             }).toList(),
           ),
-          SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  Widget _unsupportedCountyCard(AppColors colors, String county) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.map_outlined, color: colors.accent, size: 18),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Local offices for $county aren\'t in Civic Route yet',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: colors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
           Text(
-            'Suggested script: “I am contacting your office about ${widget.issue.name.toLowerCase()} and would like guidance on the next steps and the correct office to handle this issue.”',
-            style: TextStyle(fontSize: 12, color: colors.muted, height: 1.5),
+            'Federal and state officials work everywhere, but county offices are only '
+            'built in for Baltimore County, Maryland so far. These can still get you to the right place:',
+            style: TextStyle(color: colors.muted, fontSize: 13, height: 1.5),
+          ),
+          SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => openLink(context, Uri.parse('https://www.usa.gov/local-governments')),
+                icon: Icon(Icons.language, size: 16),
+                label: Text('Find your local government'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => openLink(context, Uri.parse('tel:211')),
+                icon: Icon(Icons.call, size: 16),
+                label: Text('Call 211'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _disclaimer(AppColors colors) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 12),
+      child: Text(
+        'Contact information can change. Confirm with the office before you rely on it.',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: colors.muted, fontSize: 12, height: 1.4),
+      ),
+    );
+  }
+
+  Widget _warningCard(AppColors colors, String message) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.accentSoft,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: colors.accent, size: 18),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: colors.textPrimary, fontSize: 13, height: 1.4),
+            ),
           ),
         ],
       ),
@@ -318,25 +569,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
             style: TextStyle(color: colors.muted, fontSize: 13, height: 1.5),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _pill(String text, AppColors colors) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.border),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: colors.textPrimary,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }
@@ -382,6 +614,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final isFavorite = favoriteContacts.contains(_contactKey(c));
     final hasPhone = c.phone != null;
     final hasWebsite = c.website != null;
+    final hasEmail = c.email != null;
+    final verified = formatVerified(c.lastVerified);
 
     return Semantics(
       label: 'Contact card for ${c.name}, ${c.office}',
@@ -414,6 +648,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
                         c.office,
                         style: TextStyle(fontSize: 13, color: colors.muted),
                       ),
+                      if (c.address != null) ...[
+                        SizedBox(height: 4),
+                        Text(
+                          c.address!,
+                          style: TextStyle(fontSize: 12, color: colors.muted, height: 1.3),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -450,11 +691,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 if (hasPhone)
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => launchUrl(
-                        Uri.parse(
-                          'tel:${c.phone!.replaceAll(RegExp(r'[^\d+]'), '')}',
-                        ),
-                      ),
+                      onPressed: () => openLink(context, phoneUri(c.phone!)),
                       icon: Icon(Icons.call, size: 16, color: Colors.white),
                       label: Text(
                         c.phone!,
@@ -471,10 +708,21 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 else if (hasWebsite)
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => launchUrl(Uri.parse(c.website!)),
+                      onPressed: () => openLink(context, Uri.parse(c.website!)),
                       icon: Icon(Icons.language, size: 16),
                       label: Text(
                         'Website',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  )
+                else if (hasEmail)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => openLink(context, Uri(scheme: 'mailto', path: c.email!)),
+                      icon: Icon(Icons.mail_outline, size: 16),
+                      label: Text(
+                        'Email',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -502,17 +750,34 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 ),
               ],
             ),
-            if (hasPhone && hasWebsite) ...[
-              SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => launchUrl(Uri.parse(c.website!)),
-                icon: Icon(Icons.language, size: 16),
-                label: Text(
-                  'Website',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+            SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: [
+                if (hasPhone && hasWebsite)
+                  TextButton.icon(
+                    onPressed: () => openLink(context, Uri.parse(c.website!)),
+                    icon: Icon(Icons.language, size: 16),
+                    label: Text('Website'),
+                  ),
+                if (hasEmail && (hasPhone || hasWebsite))
+                  TextButton.icon(
+                    onPressed: () => openLink(context, Uri(scheme: 'mailto', path: c.email!)),
+                    icon: Icon(Icons.mail_outline, size: 16),
+                    label: Text('Email'),
+                  ),
+                TextButton.icon(
+                  onPressed: () => _copy(c.toShareText(), 'Contact details copied'),
+                  icon: Icon(Icons.copy, size: 16),
+                  label: Text('Copy details'),
                 ),
+              ],
+            ),
+            if (verified != null)
+              Text(
+                'Verified $verified',
+                style: TextStyle(fontSize: 11, color: colors.muted),
               ),
-            ],
           ],
         ),
       ),

@@ -1,0 +1,163 @@
+{
+  "updated": "2026-09",
+  "note": "Hand-verified contacts. Keys are \"County, ST\" using the Census county name. Edit and commit to update the app without a release.",
+  "counties": {
+    "Baltimore County, MD": [
+      {
+        "lastVerified": "2026-09",
+        "name": "Kathy Klausmeier",
+        "office": "Baltimore County Executive",
+        "phone": "410-887-2450",
+        "website": "https://www.baltimorecountymd.gov/departments/executive",
+        "level": "county",
+        "issueIds": []
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Baltimore County Council",
+        "office": "County Council (all 7 districts)",
+        "phone": "410-887-3196",
+        "website": "https://countycouncil.baltimorecountymd.gov",
+        "level": "county",
+        "issueIds": []
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "BaltCo 311",
+        "office": "Report a problem or request a service",
+        "phone": "410-887-0311",
+        "website": "https://www.baltimorecountymd.gov/report-problem",
+        "level": "county",
+        "issueIds": []
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Bureau of Highways",
+        "office": "Roads, potholes, sidewalks, snow removal",
+        "phone": "410-887-3560",
+        "website": "https://www.baltimorecountymd.gov/departments/public-works/highways",
+        "level": "county",
+        "issueIds": [
+          "local-roads"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "MD Attorney General — Consumer Protection Division",
+        "office": "Landlord/tenant dispute mediation",
+        "phone": "410-528-8662",
+        "website": "https://oag.maryland.gov/i-need-to/Pages/landlord-tenant-disputes.aspx",
+        "level": "state",
+        "issueIds": [
+          "landlord"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Baltimore County Department of Health",
+        "office": "Public health services & clinics",
+        "phone": "410-887-2243",
+        "website": "https://www.baltimorecountymd.gov/departments/health",
+        "level": "county",
+        "issueIds": [
+          "clinics"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Baltimore County Public Schools",
+        "office": "Board of Education",
+        "phone": "443-809-4554",
+        "website": "https://www.bcps.org/board_of_education",
+        "level": "county",
+        "issueIds": [
+          "k12"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Baltimore County Police Department",
+        "office": "Non-emergency line",
+        "phone": "410-887-2222",
+        "website": "https://www.baltimorecountymd.gov/departments/police",
+        "level": "county",
+        "issueIds": [
+          "local-police"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Bureau of Solid Waste Management",
+        "office": "Trash & recycling collection",
+        "phone": "410-887-2000",
+        "website": "https://www.baltimorecountymd.gov/departments/public-works",
+        "level": "county",
+        "issueIds": [
+          "waste"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "MD SDAT — Baltimore County Assessments",
+        "office": "Property tax assessment",
+        "phone": "410-512-4900",
+        "website": "https://dat.maryland.gov/realproperty",
+        "level": "state",
+        "issueIds": [
+          "property-tax"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Baltimore County Board of Elections",
+        "office": "Voter registration & polling places",
+        "phone": "410-887-5700",
+        "website": "https://www.baltimorecountymd.gov/departments/elections",
+        "level": "county",
+        "issueIds": [
+          "local-election"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Baltimore County Department of Planning",
+        "office": "Zoning & land use",
+        "phone": "410-887-3211",
+        "website": "https://www.baltimorecountymd.gov/departments/planning",
+        "level": "county",
+        "issueIds": [
+          "local-zoning"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Permits, Approvals and Inspections",
+        "office": "Building permits & inspections",
+        "phone": "410-887-3900",
+        "website": "https://www.baltimorecountymd.gov/departments/pai",
+        "level": "county",
+        "issueIds": [
+          "local-zoning"
+        ]
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "R. Jay Fisher",
+        "office": "Baltimore County Sheriff",
+        "phone": "410-887-3151",
+        "website": "https://www.baltimorecountymd.gov/departments/sheriff",
+        "level": "county",
+        "issueIds": []
+      },
+      {
+        "lastVerified": "2026-09",
+        "name": "Scott D. Shellenberger",
+        "office": "Baltimore County State's Attorney",
+        "phone": "410-887-6600",
+        "website": "https://www.baltimorecountymd.gov/departments/states-attorney",
+        "level": "county",
+        "issueIds": []
+      }
+    ]
+  }
+}

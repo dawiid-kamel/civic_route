@@ -1,11 +1,25 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'env_loader.dart';
+/// Federal lookups via the Congress.gov API (through the API relay).
+///
+/// `fetchFederalReps` returns the House member for a state + district and
+/// `fetchSenators` returns a state's two senators, both as `Contact`s.
+/// `resolver_service.dart` calls them for the `federal_house` and
+/// `federal_senate` levels. Member details are fetched in parallel and cached
+/// in memory, since members rarely change. The API key lives on the relay
+/// (`worker/`), never in the app.
+library;
+
+import 'package:flutter/foundation.dart';
+
 import '../models/contact.dart';
+import 'api_client.dart';
+import 'congress_number.dart';
 
-String? _memberChamber(dynamic member) {
+const _detailTtl = Duration(hours: 12);
+final Map<String, ({DateTime at, Map<String, String?> data})> _detailCache = {};
+
+/// The chamber of a member's most recent term, e.g. "Senate" or "House of Representatives".
+String? memberChamber(dynamic member) {
   if (member is! Map) return null;
-
   final rawTerms = member['terms'];
   final terms = rawTerms is List
       ? rawTerms
@@ -16,84 +30,87 @@ String? _memberChamber(dynamic member) {
   return lastTerm is Map ? lastTerm['chamber']?.toString() : null;
 }
 
+Future<Map<String, dynamic>> _congressGet(String path, Map<String, String> query) async {
+  final data = await getJson(relayUri('congress/$path', query), service: 'Congress.gov');
+  if (data is! Map<String, dynamic>) {
+    throw AppException('Congress.gov sent an unexpected response. Please try again later.');
+  }
+  return data;
+}
+
 Future<List<Contact>> fetchFederalReps(String stateAbbr, String district) async {
-  final apiKey = appEnv['CONGRESS_API_KEY'];
-  final url = Uri.parse(
-    'https://api.congress.gov/v3/member/congress/119/$stateAbbr/$district'
-    '?currentMember=true&api_key=$apiKey&format=json'
+  final data = await _congressGet(
+    'member/congress/${currentCongress()}/$stateAbbr/$district',
+    {'currentMember': 'true'},
   );
-
-  final response = await http.get(url);
-  if (response.statusCode != 200) {
-    throw Exception('Congress API failed: ${response.statusCode}');
-  }
-
-  final data = jsonDecode(response.body);
-  final members = data['members'] as List;
-
-  List<Contact> contacts = [];
-  for (var m in members) {
-    final bioguideId = m['bioguideId'];
-    final detail = await fetchMemberDetail(bioguideId, apiKey!);
-    contacts.add(Contact(
-      name: detail['name'] ?? m['name'] ?? 'Unknown',
-      office: 'U.S. House Representative',
-      phone: detail['phone'],
-      website: detail['website'],
-      level: 'federal',
-    ));
-  }
-  return contacts;
+  final members = (data['members'] as List?) ?? const [];
+  return _contactsFor(members, 'U.S. House Representative');
 }
 
-Future<Map<String, String?>> fetchMemberDetail(String bioguideId, String apiKey) async {
-  final url = Uri.parse(
-    'https://api.congress.gov/v3/member/$bioguideId?format=json&api_key=$apiKey'
-  );
-  final response = await http.get(url);
-  if (response.statusCode != 200) {
-    return {'name': null, 'phone': null, 'website': null};
-  }
-
-  final data = jsonDecode(response.body);
-  final member = data['member'];
-  final addressInfo = member['addressInformation'];
-
-  return {
-    'name': member['directOrderName']?.toString(),
-    'phone': addressInfo is Map ? addressInfo['phoneNumber']?.toString() : null,
-    'website': member['officialWebsiteUrl']?.toString(),
-    'chamber': _memberChamber(member),
-  };
-}
 Future<List<Contact>> fetchSenators(String stateAbbr) async {
-  final apiKey = appEnv['CONGRESS_API_KEY'];
-  final url = Uri.parse(
-    'https://api.congress.gov/v3/member/congress/119/$stateAbbr'
-    '?currentMember=true&limit=250&api_key=$apiKey&format=json'
+  // This endpoint lists every current member of the state (a few dozen at
+  // most), so one small request is enough to pick out the two senators.
+  final data = await _congressGet(
+    'member/congress/${currentCongress()}/$stateAbbr',
+    {'currentMember': 'true', 'limit': '60'},
   );
+  final members = ((data['members'] as List?) ?? const [])
+      .where((m) => memberChamber(m) == 'Senate')
+      .toList();
+  return _contactsFor(members, 'U.S. Senator');
+}
 
-  final response = await http.get(url);
-  if (response.statusCode != 200) {
-    throw Exception('Congress API failed: ${response.statusCode}');
-  }
-
-  final data = jsonDecode(response.body);
-  final members = data['members'] as List;
-
-  List<Contact> contacts = [];
-  // Request all members because the default first page can contain only House members.
-  for (var s in members) {
-    if (_memberChamber(s) != 'Senate') continue;
-    final bioguideId = s['bioguideId'];
-    final detail = await fetchMemberDetail(bioguideId, apiKey!);
-    contacts.add(Contact(
-      name: detail['name'] ?? s['name'] ?? 'Unknown',
-      office: 'U.S. Senator',
+/// Looks up every member's details at the same time (not one after another).
+Future<List<Contact>> _contactsFor(List members, String office) {
+  final valid = members.whereType<Map>().where((m) => m['bioguideId'] != null);
+  return Future.wait(valid.map((m) async {
+    final detail = await fetchMemberDetail(m['bioguideId'].toString());
+    return Contact(
+      name: detail['name'] ?? m['name']?.toString() ?? 'Unknown',
+      office: office,
       phone: detail['phone'],
       website: detail['website'],
+      address: detail['address'],
       level: 'federal',
-    ));
+    );
+  }));
+}
+
+/// One member's name, phone, website and office address. A failure here
+/// returns empty fields (and is logged) instead of throwing, so one bad
+/// lookup can't wipe out the whole list of officials.
+Future<Map<String, String?>> fetchMemberDetail(String bioguideId) async {
+  final cached = _detailCache[bioguideId];
+  if (cached != null && DateTime.now().difference(cached.at) < _detailTtl) {
+    return cached.data;
   }
-  return contacts;
+  try {
+    final data = await _congressGet('member/$bioguideId', const {});
+    final member = data['member'];
+    if (member is! Map) return const {};
+    final addressInfo = member['addressInformation'];
+
+    String? address;
+    if (addressInfo is Map && addressInfo['officeAddress'] != null) {
+      final parts = [
+        addressInfo['officeAddress'],
+        addressInfo['city'],
+        addressInfo['district'],
+        addressInfo['zipCode'],
+      ].where((p) => p != null && p.toString().trim().isNotEmpty).map((p) => p.toString().trim());
+      address = parts.join(', ');
+    }
+
+    final result = <String, String?>{
+      'name': member['directOrderName']?.toString(),
+      'phone': addressInfo is Map ? addressInfo['phoneNumber']?.toString() : null,
+      'website': member['officialWebsiteUrl']?.toString(),
+      'address': address,
+    };
+    _detailCache[bioguideId] = (at: DateTime.now(), data: result);
+    return result;
+  } catch (e) {
+    debugPrint('fetchMemberDetail($bioguideId) failed: $e');
+    return const {};
+  }
 }

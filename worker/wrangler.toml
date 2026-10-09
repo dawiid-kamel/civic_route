@@ -1,0 +1,7 @@
+name = "civic-route-api"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Secrets are NOT stored here. Set them once with:
+#   npx wrangler secret put CONGRESS_API_KEY
+#   npx wrangler secret put OPENSTATES_API_KEY

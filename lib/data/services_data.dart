@@ -1,4 +1,16 @@
+/// Shared list of resident-facing service shortcuts (permits, utilities, ...).
+///
+/// Both the Home screen's horizontal tiles and the Resident hub list read
+/// `hubServices`, so the two screens always show the same items. Tapping a
+/// service opens a sheet in the hub listing the offices for the user's county
+/// (`serviceContactsFor`, backed by `countyServiceDirectory` in
+/// `county_data.dart`).
+library;
+
 import 'package:flutter/material.dart';
+
+import '../models/contact.dart';
+import 'county_data.dart';
 
 /// A resident-facing local service shortcut (city services, permits, etc).
 ///
@@ -55,3 +67,10 @@ const List<HubService> hubServices = [
     icon: Icons.groups_outlined,
   ),
 ];
+
+/// Offices to contact for a hub service in the given county ("County, ST" key). Empty when that
+/// county has no entries yet, so the hub can say so instead of showing a blank.
+List<Contact> serviceContactsFor(String? countyKey, String serviceTitle) {
+  if (countyKey == null) return const [];
+  return countyServiceDirectory[countyKey]?[serviceTitle] ?? const [];
+}

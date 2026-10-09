@@ -1,7 +1,17 @@
+/// Asks for location permission after the tutorial.
+///
+/// "Use my location" saves the coordinates, "Enter an address instead" looks
+/// one up (`widgets/address_dialog.dart`), and "Skip" / "I'll do this later"
+/// continues without a location. Either way `onboarded` is saved and the user
+/// moves to `HomeScreen`. The saved position is what Results and the
+/// Resident hub use to find local officials.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../services/device_location_service.dart';
-import '../../theme.dart';
+import '../services/device_location_service.dart';
+import '../theme.dart';
+import '../widgets/address_dialog.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -19,12 +29,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('lat', pos.latitude);
       await prefs.setDouble('lng', pos.longitude);
+      await prefs.setString('location_source', 'gps');
       await prefs.setBool('onboarded', true);
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen()));
     } catch (e) {
+      if (!mounted) return;
       setState(() => busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      final message = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Couldn\'t get your location: $message')));
     }
+  }
+
+  Future<void> useAddress() async {
+    final saved = await promptForAddress(context);
+    if (!saved || !mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarded', true);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen()));
   }
 
   Future<void> _skip() async {
@@ -85,7 +108,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     _point(Icons.navigation, "We use your location to find your actual representatives.", colors),
                     SizedBox(height: 16),
-                    _point(Icons.lock_outline, "Nothing is stored or shared — it stays on your device.", colors),
+                    _point(Icons.lock_outline, "Your location is saved only on your device and sent just to public government lookup services to find your officials.", colors),
                     SizedBox(height: 16),
                     _point(Icons.flash_on, "No account, no ads. Straight to the phone number.", colors),
                     Spacer(),
@@ -97,7 +120,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       child: busy
-                          ? CircularProgressIndicator(color: Colors.white)
+                          ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
                           : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                               Icon(Icons.location_on, color: Colors.white, size: 18),
                               SizedBox(width: 8),
@@ -105,6 +128,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ]),
                     ),
                     SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: busy ? null : useAddress,
+                      style: OutlinedButton.styleFrom(minimumSize: Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                      child: Text('Enter an address instead', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    SizedBox(height: 4),
                     // Denying/skipping location used to leave you stuck on
                     // this screen forever with no way forward — `onboarded`
                     // was only ever set inside the success path above.

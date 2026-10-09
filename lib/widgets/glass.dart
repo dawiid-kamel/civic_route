@@ -1,3 +1,10 @@
+/// Frosted-glass card widget.
+///
+/// `GlassContainer` blurs whatever is behind it and adds a translucent tint.
+/// It is used on the gradient Home screen (category cards, location pill,
+/// empty-search message) so the content stays readable over the backdrop.
+library;
+
 import 'dart:ui';
 
 import 'package:flutter/material.dart';

@@ -1,59 +1,69 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+/// Tests for the resolver: county directory lookups, plus an optional live
+/// test of the full pipeline (coordinates, location, House, Senate, state).
+///
+/// The live test needs your relay address:
+/// `flutter test --dart-define=API_BASE_URL=https://your-relay.workers.dev`
+library;
+
+import 'package:civic_route/config.dart';
+import 'package:civic_route/models/location_info.dart';
 import 'package:civic_route/services/location_service.dart';
 import 'package:civic_route/services/resolver_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+LocationInfo _location(String county, String abbr) => LocationInfo(
+      county: county,
+      state: 'Somewhere',
+      stateAbbr: abbr,
+      congressionalDistrict: '1',
+      lat: 39.4,
+      lng: -76.6,
+    );
 
 void main() {
-  test('full pipeline: coordinates -> location -> federal house rep', () async {
-    await dotenv.load(fileName: ".env");
-
-    // Baltimore coordinates as a placeholder — swap in your real ones if you want
-    const lat = 39.29;
-    const lng = -76.61;
-
-    print("Resolving location for ($lat, $lng)...");
-    final location = await resolveLocation(lat, lng);
-
-    print("County: ${location.county}");
-    print("State: ${location.state} (${location.stateAbbr})");
-    print("Congressional District: ${location.congressionalDistrict}");
-
-    expect(location.county, isNotEmpty);
-    expect(location.stateAbbr, isNotEmpty);
-
-    print("\nFetching federal House rep...");
-    final houseReps = await getContactsForIssue('federal_house', location);
-
-    for (var rep in houseReps) {
-      print("---");
-      print("Name: ${rep.name}");
-      print("Phone: ${rep.phone}");
-      print("Website: ${rep.website}");
-    }
-
-    expect(houseReps, isNotEmpty);
-
-    print("\nFetching federal senators...");
-    final senators = await getContactsForIssue('federal_senate', location);
-
-    for (var sen in senators) {
-      print("---");
-      print("Name: ${sen.name}");
-      print("Phone: ${sen.phone}");
-      print("Website: ${sen.website}");
-    }
-
-    expect(senators, isNotEmpty);
-
-    print("\nFetching state legislators...");
-    final stateReps = await getContactsForIssue('state', location);
-
-    for (var rep in stateReps) {
-      print("---");
-      print("Name: ${rep.name}");
-      print("Office: ${rep.office}");
-    }
-
-    expect(stateReps, isNotEmpty);
+  test('county key includes the state', () {
+    expect(countyKeyFor(_location('Baltimore County', 'MD')), 'Baltimore County, MD');
   });
+
+  test('Baltimore County, MD has contacts; same-named counties elsewhere do not', () async {
+    final md = _location('Baltimore County', 'MD');
+    expect(hasCountyDirectory(md), isTrue);
+    expect(await getContactsForIssue('county', md), isNotEmpty);
+
+    final other = _location('Washington County', 'OR');
+    expect(hasCountyDirectory(other), isFalse);
+    expect(await getContactsForIssue('county', other), isEmpty);
+  });
+
+  test('county contacts are filtered by issue', () async {
+    final md = _location('Baltimore County', 'MD');
+    final roads = await getContactsForIssue('county', md, issueId: 'local-roads');
+    final all = await getContactsForIssue('county', md);
+    expect(roads, isNotEmpty);
+    expect(roads.length, lessThan(all.length));
+  });
+
+  test('a missing district skips the House lookup instead of failing', () async {
+    final noDistrict = LocationInfo(
+      county: 'Baltimore County',
+      state: 'Maryland',
+      stateAbbr: 'MD',
+      congressionalDistrict: null,
+      lat: 39.4,
+      lng: -76.6,
+    );
+    expect(await getContactsForIssue('federal_house', noDistrict), isEmpty);
+  });
+
+  test(
+    'live: coordinates -> location -> federal and state officials',
+    () async {
+      final location = await resolveLocation(39.29, -76.61);
+      expect(location.stateAbbr, 'MD');
+      expect(await getContactsForIssue('federal_house', location), isNotEmpty);
+      expect(await getContactsForIssue('federal_senate', location), isNotEmpty);
+      expect(await getContactsForIssue('state', location), isNotEmpty);
+    },
+    skip: AppConfig.hasApi ? null : 'Pass --dart-define=API_BASE_URL=<relay URL> to run live tests.',
+  );
 }

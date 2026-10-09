@@ -1,5 +1,5 @@
 name: civic_route
-description: "A new Flutter project."
+description: "Civic Route: find who to contact about a local, state, or federal issue, with phone numbers, websites, and what to say."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -14,7 +14,6 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.6.0
   geolocator: ^14.0.3
-  flutter_dotenv: ^6.0.1
   url_launcher: ^6.3.2
   shared_preferences: ^2.5.5
 
@@ -39,5 +38,3 @@ icons_launcher:
 
 flutter:
   uses-material-design: true
-  assets:
-    - .env

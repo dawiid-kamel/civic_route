@@ -1,7 +1,20 @@
+/// App entry point for CivicRoute.
+///
+/// Installs the global error hooks (`services/error_reporting.dart`), loads
+/// the saved/hosted county directory (`services/directory_service.dart`), then
+/// picks the first screen from saved preferences:
+/// the tutorial on first launch, onboarding once the tutorial is done, and
+/// the home screen after that. It also builds the light and dark `ThemeData`
+/// from the shared palette in `theme.dart`.
+library;
+
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'services/env_loader.dart';
+import 'services/directory_service.dart';
+import 'services/error_reporting.dart';
 import 'screens/tutorial_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
@@ -9,9 +22,18 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
-  appEnv['CONGRESS_API_KEY'] = dotenv.env['CONGRESS_API_KEY'] ?? '';
-  appEnv['OPENSTATES_API_KEY'] = dotenv.env['OPENSTATES_API_KEY'] ?? '';
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    reportError(details.exception, details.stack);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    reportError(error, stack);
+    return true;
+  };
+
+  // Saved directory is applied right away; the fresh download happens in the background.
+  await loadSavedDirectory();
+  unawaited(refreshDirectory());
 
   final prefs = await SharedPreferences.getInstance();
   final tutorialSeen = prefs.getBool('tutorial_seen') ?? false;

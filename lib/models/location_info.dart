@@ -1,3 +1,11 @@
+/// Data model for the user's resolved location.
+///
+/// `services/location_service.dart` turns GPS coordinates into a
+/// `LocationInfo` (county, state, congressional district). The resolver uses
+/// it to decide which offices to query, and the Home and Resident hub
+/// screens use it for the "County, State" label.
+library;
+
 class LocationInfo {
   final String county;
   final String state;
@@ -18,4 +26,22 @@ class LocationInfo {
     required this.lat,
     required this.lng,
   });
+
+  Map<String, dynamic> toJson() => {
+        'county': county,
+        'state': state,
+        'stateAbbr': stateAbbr,
+        'district': congressionalDistrict,
+        'lat': lat,
+        'lng': lng,
+      };
+
+  factory LocationInfo.fromJson(Map<String, dynamic> j) => LocationInfo(
+        county: j['county'] as String,
+        state: j['state'] as String,
+        stateAbbr: j['stateAbbr'] as String,
+        congressionalDistrict: j['district'] as String?,
+        lat: (j['lat'] as num).toDouble(),
+        lng: (j['lng'] as num).toDouble(),
+      );
 }

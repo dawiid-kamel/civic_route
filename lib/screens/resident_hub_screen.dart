@@ -1,11 +1,27 @@
+/// Resident hub: local services, saved items and notification settings.
+///
+/// Lists `hubServices` from `data/services_data.dart`, the user's saved
+/// categories/issues (written by Home and Results), and switches for alerts
+/// and reminders. Each service sheet lists the user's county offices for that
+/// service (phone and website). Where a county has no directory yet, or there
+/// is no event feed, the sheet says "No new events found" / "No local options
+/// found yet".
+library;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../data/issue_tree.dart';
-import '../../data/services_data.dart';
-import '../../services/device_location_service.dart';
-import '../../services/resolver_service.dart';
-import '../../theme.dart';
+import '../config.dart';
+import '../data/issue_tree.dart';
+import '../data/services_data.dart';
+import '../models/contact.dart';
+import '../services/device_location_service.dart';
+import '../services/launcher.dart';
+import '../services/resolver_service.dart';
+import '../theme.dart';
+import '../util/format.dart';
+import '../widgets/address_dialog.dart';
 
 class ResidentHubScreen extends StatefulWidget {
   final String? initialService;
@@ -18,6 +34,8 @@ class ResidentHubScreen extends StatefulWidget {
 
 class _ResidentHubScreenState extends State<ResidentHubScreen> {
   String locationLabel = 'Your local service area';
+  // "County, ST" key (e.g. "Baltimore County, MD") used to look up local offices.
+  String? countyName;
   List<String> savedCategoryNames = [];
   List<String> savedIssueNames = [];
   bool alertsEnabled = true;
@@ -33,13 +51,17 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     var label = 'Your local service area';
+    String? county;
     final lat = prefs.getDouble('lat');
     final lng = prefs.getDouble('lng');
     if (lat != null && lng != null) {
       try {
         final location = await getCachedLocation(lat, lng);
         label = '${location.county}, ${location.state}';
-      } catch (_) {}
+        county = countyKeyFor(location);
+      } catch (e) {
+        debugPrint('Resident hub location lookup failed: $e');
+      }
     }
 
     // "My civic follow-up" used to only ever show saved *categories*, even
@@ -48,19 +70,19 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     // elsewhere in the app actually shows up here.
     final savedCategoryIds = prefs.getStringList('saved_categories') ?? [];
     final savedIssueIds = prefs.getStringList('saved_issues') ?? [];
-    final categoryNames = issueTree
-        .where((c) => savedCategoryIds.contains(c.id))
-        .map((c) => c.name)
+    final categoryNames = savedCategoryIds
+        .map((id) => findCategoryById(id)?.name)
+        .whereType<String>()
         .toList();
-    final issueNames = issueTree
-        .expand((c) => c.subIssues)
-        .where((i) => savedIssueIds.contains(i.id))
-        .map((i) => i.name)
+    final issueNames = savedIssueIds
+        .map((id) => findIssueById(id)?.name)
+        .whereType<String>()
         .toList();
 
     if (!mounted) return;
     setState(() {
       locationLabel = label;
+      countyName = county;
       savedCategoryNames = categoryNames;
       savedIssueNames = issueNames;
       alertsEnabled = prefs.getBool('alerts_enabled') ?? true;
@@ -75,15 +97,22 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('lat', position.latitude);
       await prefs.setDouble('lng', position.longitude);
+      await prefs.setString('location_source', 'gps');
     } catch (e) {
+      debugPrint('Refresh location failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not refresh location: $e')),
+          SnackBar(content: Text("Couldn't get your location. Turn on location access, or enter an address instead.")),
         );
       }
     }
     await _load();
     if (mounted) setState(() => refreshing = false);
+  }
+
+  Future<void> _enterAddress() async {
+    final saved = await promptForAddress(context);
+    if (saved && mounted) await _load();
   }
 
   Future<void> _setPreference(String key, bool value) async {
@@ -92,57 +121,144 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
   }
 
   void _showService(HubService service, AppColors colors) {
+    final contacts = serviceContactsFor(countyName, service.title);
+    final isCommunity = service.title == 'Community programs';
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       backgroundColor: colors.surface,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(service.icon, color: colors.accent, size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      service.title,
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: colors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Text(
+                service.subtitle,
+                style: TextStyle(color: colors.muted, height: 1.4),
+              ),
+              SizedBox(height: 16),
+              // Stub: there is no live events feed yet, so Community programs
+              // says so plainly (the offices below are still real).
+              if (isCommunity && AppConfig.enableLocalAlerts) ...[
+                _sheetNotice(colors, Icons.event_busy_outlined, 'No new events found for $locationLabel.'),
+                SizedBox(height: 12),
+              ],
+              if (contacts.isEmpty)
+                _sheetNotice(colors, Icons.search_off, 'No local options found yet for $locationLabel.')
+              else
+                ...contacts.map((c) => _sheetContact(c, colors)),
+              SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(minimumSize: Size.fromHeight(48)),
+                  child: Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sheetNotice(AppColors colors, IconData icon, String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: colors.muted, size: 18),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontWeight: FontWeight.w700, color: colors.textPrimary, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sheetContact(Contact c, AppColors colors) {
+    final hasPhone = c.phone != null;
+    final hasWebsite = c.website != null;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            c.name,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: colors.textPrimary),
+          ),
+          SizedBox(height: 2),
+          Text(c.office, style: TextStyle(fontSize: 13, color: colors.muted, height: 1.3)),
+          if (formatVerified(c.lastVerified) != null)
+            Text('Verified ${formatVerified(c.lastVerified)}', style: TextStyle(fontSize: 11, color: colors.muted)),
+          if (hasPhone || hasWebsite) ...[
+            SizedBox(height: 10),
             Row(
               children: [
-                Icon(service.icon, color: colors.accent, size: 24),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    service.title,
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: colors.textPrimary),
+                if (hasPhone)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => openLink(context, phoneUri(c.phone!)),
+                      icon: Icon(Icons.call, size: 16, color: Colors.white),
+                      label: Text(
+                        c.phone!,
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(backgroundColor: colors.accent),
+                    ),
                   ),
-                ),
+                if (hasPhone && hasWebsite) SizedBox(width: 8),
+                if (hasWebsite)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => openLink(context, Uri.parse(c.website!)),
+                      icon: Icon(Icons.language, size: 16),
+                      label: Text('Website', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
               ],
             ),
-            SizedBox(height: 8),
-            Text(
-              service.subtitle,
-              style: TextStyle(color: colors.muted, height: 1.4),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Available for $locationLabel',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: colors.textPrimary,
-              ),
-            ),
-            SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.open_in_new),
-                label: Text('View local options'),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: Size.fromHeight(48),
-                  backgroundColor: colors.accent,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -170,13 +286,45 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
           SizedBox(height: 10),
           _savedCard(colors),
           SizedBox(height: 20),
-          Text('Notifications and alerts', style: _headingStyle(colors)),
-          SizedBox(height: 10),
-          _settingsCard(colors),
-          SizedBox(height: 20),
+          if (AppConfig.enableLocalAlerts) ...[
+            Text('Notifications and alerts', style: _headingStyle(colors)),
+            SizedBox(height: 10),
+            _settingsCard(colors),
+            SizedBox(height: 20),
+          ],
           Text('What happens next?', style: _headingStyle(colors)),
           SizedBox(height: 10),
           _guidanceCard(colors),
+          SizedBox(height: 20),
+          Text('About', style: _headingStyle(colors)),
+          SizedBox(height: 10),
+          _aboutCard(colors),
+        ],
+      ),
+    );
+  }
+
+  Widget _aboutCard(AppColors colors) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceSecondary,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Contact information can change. Confirm with the office before you rely on it.',
+            style: TextStyle(color: colors.muted, fontSize: 13, height: 1.4),
+          ),
+          SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => openLink(context, Uri.parse(AppConfig.privacyPolicyUrl)),
+            icon: Icon(Icons.privacy_tip_outlined, size: 18),
+            label: Text('Privacy policy'),
+          ),
         ],
       ),
     );
@@ -235,6 +383,10 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
             ].map((label) => _locationPill(label)).toList(),
           ),
           SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
           OutlinedButton.icon(
             onPressed: refreshing ? null : _refreshLocation,
             icon: refreshing
@@ -254,6 +406,19 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: Colors.white54),
             ),
+          ),
+          OutlinedButton.icon(
+            onPressed: refreshing ? null : _enterAddress,
+            icon: Icon(Icons.edit_location_alt_outlined, color: Colors.white, size: 18),
+            label: Text(
+              'Enter an address',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.white54),
+            ),
+          ),
+            ],
           ),
         ],
       ),
@@ -384,7 +549,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Track each issue from Issue found to Action steps ready.',
+                  'Track each saved topic from Not started to Resolved.',
                   style: TextStyle(color: colors.muted, fontSize: 12),
                 ),
               ],
@@ -427,6 +592,26 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
               setState(() => remindersEnabled = value);
               _setPreference('reminders_enabled', value);
             },
+          ),
+          Divider(height: 1, color: colors.border),
+          // Stub: the switches above are saved, but no alert/reminder source
+          // exists yet, so say so instead of leaving the card silent.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            child: Row(
+              children: [
+                Icon(Icons.notifications_none, size: 18, color: colors.muted),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    (!alertsEnabled && !remindersEnabled)
+                        ? 'Notifications are turned off.'
+                        : 'No new events or reminders right now.',
+                    style: TextStyle(color: colors.muted, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
