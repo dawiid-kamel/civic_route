@@ -16,6 +16,8 @@ dependencies:
   geolocator: ^14.0.3
   url_launcher: ^6.3.2
   shared_preferences: ^2.5.5
+  flutter_local_notifications: ^20.0.0
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:

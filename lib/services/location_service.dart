@@ -1,8 +1,9 @@
 /// Turns coordinates (or a street address) into county, state and district.
 ///
 /// Calls the free U.S. Census geocoder. `resolveLocation` fetches and
-/// `parseCensusResponse` (pure, unit tested) reads the answer. `geocodeAddress`
-/// powers "Enter an address instead" for people who don't share GPS.
+/// `parseCensusResponse` (pure, unit tested) reads the answer. `searchAddresses`
+/// (suggestions) and `geocodeAddress` (best match) power the address picker for
+/// people who don't share GPS.
 /// `resolver_service.dart` caches the result; the Home/Hub screens show it as
 /// a label. If the Census data has no district, `congressionalDistrict` is null
 /// so only House-rep lookups are skipped and county/state lookups still work.
@@ -80,9 +81,14 @@ LocationInfo parseCensusResponse(dynamic data, double lat, double lng) {
   );
 }
 
-/// Finds coordinates for a street address using the Census geocoder
-/// (street addresses only; the Census service does not accept a bare ZIP code).
-Future<({double lat, double lng, String matched})> geocodeAddress(String address) async {
+typedef AddressMatch = ({double lat, double lng, String matched});
+
+/// Looks up a street address and returns every match the Census geocoder
+/// finds (best first), so the address picker can offer them as suggestions.
+/// Returns an empty list when nothing matches; throws [AppException] when the
+/// service can't be reached. (Street addresses only; the Census service does
+/// not accept a bare ZIP code.)
+Future<List<AddressMatch>> searchAddresses(String address) async {
   final trimmed = address.trim();
   if (trimmed.length < 6) throw AppException('Enter a full street address, including city and state.');
   final url = Uri.https('geocoding.geo.census.gov', '/geocoder/locations/onelineaddress', {
@@ -91,17 +97,37 @@ Future<({double lat, double lng, String matched})> geocodeAddress(String address
     'format': 'json',
   });
   final data = await getJson(url, service: 'The Census geocoder');
-  final result = data is Map ? data["result"] : null;
-  final rawMatches = result is Map ? result["addressMatches"] : null;
-  final matches = rawMatches is List ? rawMatches : null;
-  if (matches == null || matches.isEmpty) {
+  return parseAddressMatches(data, trimmed);
+}
+
+/// Reads a Census "onelineaddress" response into a list of matches (pure, so
+/// it can be unit tested). Entries without usable coordinates are skipped.
+List<AddressMatch> parseAddressMatches(dynamic data, String typed) {
+  final result = data is Map ? data['result'] : null;
+  final rawMatches = result is Map ? result['addressMatches'] : null;
+  if (rawMatches is! List) return const [];
+  final matches = <AddressMatch>[];
+  for (final m in rawMatches) {
+    if (m is! Map) continue;
+    final coords = m['coordinates'];
+    final x = coords is Map ? coords['x'] : null;
+    final y = coords is Map ? coords['y'] : null;
+    if (x is! num || y is! num) continue;
+    matches.add((
+      lat: y.toDouble(),
+      lng: x.toDouble(),
+      matched: m['matchedAddress']?.toString() ?? typed,
+    ));
+  }
+  return matches;
+}
+
+/// Finds coordinates for a street address using the Census geocoder (the best
+/// match). Used when the user submits what they typed without picking a suggestion.
+Future<AddressMatch> geocodeAddress(String address) async {
+  final matches = await searchAddresses(address);
+  if (matches.isEmpty) {
     throw AppException("We couldn't find that address. Check the spelling and include the city and state.");
   }
-  final m = matches.first;
-  final coords = m['coordinates'];
-  return (
-    lat: (coords['y'] as num).toDouble(),
-    lng: (coords['x'] as num).toDouble(),
-    matched: m['matchedAddress']?.toString() ?? trimmed,
-  );
+  return matches.first;
 }

@@ -18,6 +18,7 @@ import '../models/issue.dart';
 import '../services/api_client.dart';
 import '../services/device_location_service.dart';
 import '../services/launcher.dart';
+import '../services/reminder_service.dart';
 import '../services/results_cache.dart';
 import '../util/format.dart';
 import '../models/contact.dart';
@@ -211,6 +212,15 @@ class _ResultsScreenState extends State<ResultsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() => currentStatus = status);
     await prefs.setString('issue_status_${widget.issue.id}', status);
+
+    // "Contacted" / "Waiting" schedule a follow-up reminder; other statuses cancel it.
+    final scheduled = await ReminderService.updateForStatus(widget.issue, status);
+    if (scheduled && mounted) {
+      final days = ReminderService.followUpDelay.inDays;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("We'll check in with you in $days days.")),
+      );
+    }
   }
 
   Future<void> _toggleIssueSaved() async {

@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/directory_service.dart';
 import 'services/error_reporting.dart';
+import 'services/reminder_service.dart';
 import 'screens/tutorial_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
@@ -35,6 +36,9 @@ Future<void> main() async {
   await loadSavedDirectory();
   unawaited(refreshDirectory());
 
+  // Set up follow-up reminders; non-null if the app was opened by tapping one.
+  final launchIssueId = await ReminderService.init();
+
   final prefs = await SharedPreferences.getInstance();
   final tutorialSeen = prefs.getBool('tutorial_seen') ?? false;
   final onboarded = prefs.getBool('onboarded') ?? false;
@@ -49,6 +53,7 @@ Future<void> main() async {
   }
 
   runApp(MaterialApp(
+    navigatorKey: ReminderService.navigatorKey,
     title: 'Civic Route',
     themeMode: ThemeMode.system,
     theme: ThemeData(
@@ -82,4 +87,9 @@ Future<void> main() async {
     ),
     home: startScreen,
   ));
+
+  // Cold start from a reminder: open that issue once the first screen is up.
+  if (launchIssueId != null && onboarded) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => ReminderService.openIssueFromPayload(launchIssueId));
+  }
 }

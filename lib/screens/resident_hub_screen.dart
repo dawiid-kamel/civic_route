@@ -18,6 +18,7 @@ import '../data/services_data.dart';
 import '../models/contact.dart';
 import '../services/device_location_service.dart';
 import '../services/launcher.dart';
+import '../services/reminder_service.dart';
 import '../services/resolver_service.dart';
 import '../theme.dart';
 import '../util/format.dart';
@@ -591,6 +592,12 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
             onChanged: (value) {
               setState(() => remindersEnabled = value);
               _setPreference('reminders_enabled', value);
+              // Turning off clears pending follow-ups; turning on asks for permission.
+              if (value) {
+                ReminderService.requestPermission();
+              } else {
+                ReminderService.cancelAll();
+              }
             },
           ),
           Divider(height: 1, color: colors.border),

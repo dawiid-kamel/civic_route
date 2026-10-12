@@ -115,4 +115,40 @@ void main() {
       expect(parseStateLegislators({}), isEmpty);
     });
   });
+  group('parseAddressMatches', () {
+    Map<String, dynamic> response(List<Map<String, dynamic>> matches) => {
+          'result': {'addressMatches': matches},
+        };
+
+    test('returns every match with coordinates, best first', () {
+      final matches = parseAddressMatches(
+        response([
+          {'matchedAddress': '123 MAIN ST, TOWSON, MD, 21204', 'coordinates': {'x': -76.6, 'y': 39.4}},
+          {'matchedAddress': '123 MAIN ST, BALTIMORE, MD, 21201', 'coordinates': {'x': -76.61, 'y': 39.29}},
+        ]),
+        '123 main st',
+      );
+      expect(matches.length, 2);
+      expect(matches.first.matched, '123 MAIN ST, TOWSON, MD, 21204');
+      expect(matches.first.lat, 39.4);
+      expect(matches.first.lng, -76.6);
+    });
+
+    test('skips entries without usable coordinates', () {
+      final matches = parseAddressMatches(
+        response([
+          {'matchedAddress': 'NO COORDS', 'coordinates': null},
+          {'matchedAddress': 'GOOD', 'coordinates': {'x': -76.6, 'y': 39.4}},
+        ]),
+        'x',
+      );
+      expect(matches.map((m) => m.matched), ['GOOD']);
+    });
+
+    test('handles empty or malformed responses', () {
+      expect(parseAddressMatches(null, 'x'), isEmpty);
+      expect(parseAddressMatches({}, 'x'), isEmpty);
+      expect(parseAddressMatches({'result': {'addressMatches': []}}, 'x'), isEmpty);
+    });
+  });
 }
