@@ -1,3 +1,0 @@
-# For local testing with `npx wrangler dev`: copy to .dev.vars (git-ignored) and fill in.
-CONGRESS_API_KEY=
-OPENSTATES_API_KEY=

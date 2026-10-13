@@ -1,8 +1,8 @@
 /// Tests for the resolver: county directory lookups, plus an optional live
 /// test of the full pipeline (coordinates, location, House, Senate, state).
 ///
-/// The live test needs your relay address:
-/// `flutter test --dart-define=API_BASE_URL=https://your-relay.workers.dev`
+/// The live test needs both API keys:
+/// `flutter test --dart-define=CONGRESS_API_KEY=... --dart-define=OPENSTATES_API_KEY=...`
 library;
 
 import 'package:civic_route/config.dart';
@@ -60,7 +60,7 @@ void main() {
     expect(await getContactsForIssue('federal_house', noDistrict), isEmpty);
   });
 
-  /// Live test of the full pipeline (resolveLocation, then House, Senate and state contacts); skipped without API_BASE_URL.
+  /// Live test of the full pipeline (resolveLocation, then House, Senate and state contacts); skipped without the API keys.
   test(
     'live: coordinates -> location -> federal and state officials',
     () async {
@@ -70,6 +70,6 @@ void main() {
       expect(await getContactsForIssue('federal_senate', location), isNotEmpty);
       expect(await getContactsForIssue('state', location), isNotEmpty);
     },
-    skip: AppConfig.hasApi ? null : 'Pass --dart-define=API_BASE_URL=<relay URL> to run live tests.',
+    skip: AppConfig.hasApi ? null : 'Pass --dart-define=CONGRESS_API_KEY and OPENSTATES_API_KEY to run live tests.',
   );
 }

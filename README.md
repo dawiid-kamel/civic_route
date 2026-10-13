@@ -5,7 +5,7 @@ A Flutter app that answers "who do I actually call?" Pick an issue (housing, tra
 ## How it works
 1. Your location (GPS or a typed address) goes to the U.S. Census geocoder, which returns your county and congressional district.
 2. Federal officials come from Congress.gov, state legislators from Open States, and county offices from a hand-verified directory (`data/county_directory.json`).
-3. The Congress.gov and Open States API keys never ship in the app. They live in a small Cloudflare Worker relay (`worker/`) that the app calls.
+3. The app calls Congress.gov and Open States directly. Their free API keys are passed in at build time (`--dart-define`), so they are compiled into the app and can be extracted from it; rotate them if they are ever abused.
 
 Local county coverage is currently **Baltimore County, MD**. Other counties get federal and state officials plus a fallback to USA.gov and 211.
 
@@ -18,8 +18,10 @@ Marking an issue **Contacted** or **Waiting for a response** on the Results scre
 ## Run it
 ```
 flutter pub get
-# Deploy the relay first (worker/README.md), then:
-flutter run --dart-define=API_BASE_URL=https://<your-relay>.workers.dev
+# Get free keys: https://api.congress.gov/sign-up/ and https://openstates.org/accounts/profile/
+flutter run --dart-define=CONGRESS_API_KEY=<key> --dart-define=OPENSTATES_API_KEY=<key>
+# or put both in a file (one KEY=value per line, no spaces around =) and use:
+# flutter run --dart-define-from-file=.env
 ```
 Other optional settings: `DIRECTORY_URL`, `PRIVACY_POLICY_URL`, `ENABLE_LOCAL_ALERTS`, `ENABLE_ADDRESS_ENTRY` (see `lib/config.dart`). Address entry is **off by default**: the "Enter an address" buttons are grayed out and the app always uses the device GPS location. Pass `--dart-define=ENABLE_ADDRESS_ENTRY=true` to turn it back on.
 
@@ -27,7 +29,7 @@ Other optional settings: `DIRECTORY_URL`, `PRIVACY_POLICY_URL`, `ENABLE_LOCAL_AL
 ```
 flutter analyze
 flutter test                                   # offline tests
-flutter test --dart-define=API_BASE_URL=...    # also runs the live API tests
+flutter test --dart-define=CONGRESS_API_KEY=... --dart-define=OPENSTATES_API_KEY=...   # also runs the live API tests
 ```
 
 ## Project layout
@@ -37,7 +39,6 @@ flutter test --dart-define=API_BASE_URL=...    # also runs the live API tests
 | `lib/services/` | Congress.gov, Open States, Census, caching, directory refresh |
 | `lib/data/` | Issue catalog and the bundled county directory |
 | `lib/models/` | `Contact`, `Issue`, `LocationInfo` |
-| `worker/` | API relay that holds the keys |
 | `data/county_directory.json` | Hosted contact directory the app downloads at startup |
 | `docs/` | Privacy policy, release checklist, store listing drafts |
 

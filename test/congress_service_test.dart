@@ -1,8 +1,8 @@
 /// Tests for Congress numbering and member parsing, plus an optional live test.
 ///
 /// The offline tests always run. The live test hits the real API through your
-/// relay, so it only runs when you pass your relay address:
-/// `flutter test --dart-define=API_BASE_URL=https://your-relay.workers.dev`
+/// real API, so it only runs when you pass both API keys:
+/// `flutter test --dart-define=CONGRESS_API_KEY=... --dart-define=OPENSTATES_API_KEY=...`
 library;
 
 import 'package:civic_route/config.dart';
@@ -62,13 +62,13 @@ void main() {
     });
   });
 
-  /// Live test of fetchFederalReps('MD', '1'); skipped unless API_BASE_URL is provided.
+  /// Live test of fetchFederalReps('MD', '1'); skipped unless both API keys are provided.
   test(
     'live: fetchFederalReps returns a Maryland district 1 rep',
     () async {
       final reps = await fetchFederalReps('MD', '1');
       expect(reps, isNotEmpty);
     },
-    skip: AppConfig.hasApi ? null : 'Pass --dart-define=API_BASE_URL=<relay URL> to run live tests.',
+    skip: AppConfig.hasApi ? null : 'Pass --dart-define=CONGRESS_API_KEY and OPENSTATES_API_KEY to run live tests.',
   );
 }

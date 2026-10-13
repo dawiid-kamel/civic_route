@@ -42,7 +42,7 @@ Privacy policy URL: https://dawiid-kamel.github.io/civic_route/privacy.html
 ## Google Play: Data safety answers (suggested; check against the current form)
 - Collects data: **Yes**. Approximate location and precise location.
 - Purpose: App functionality only. Not used for ads, analytics or personalization.
-- Shared with third parties: location is sent to government lookup services (U.S. Census Bureau, Open States) and our relay to deliver the feature. Play lets you describe this as processing needed for functionality; answer per the form's current wording.
+- Shared with third parties: location is sent to government lookup services (U.S. Census Bureau, OpenStreetMap Nominatim, Open States, Congress.gov) to deliver the feature. Play lets you describe this as processing needed for functionality; answer per the form's current wording.
 - Collected data is encrypted in transit: **Yes** (HTTPS).
 - Users can request deletion: **Yes**. Data lives only on the device; uninstalling or clearing app data removes it.
 - No personal info, financial info, health, messages, photos, contacts, identifiers, or app activity are collected.

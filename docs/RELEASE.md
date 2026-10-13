@@ -4,7 +4,7 @@ Work top to bottom. Items marked **you** need your accounts or decisions.
 
 ## 1. Secrets (do first)
 - [ ] **you** Rotate both API keys (Congress.gov and Open States). The old ones are in git history and in zips you shared.
-- [ ] **you** Deploy the relay: see `worker/README.md`. Note the URL it prints.
+- [ ] **you** Pass the new keys at build time with `--dart-define` (see below). They are compiled into the app, so use keys you are comfortable with being extractable.
 - [ ] Stop tracking secrets and junk, from the project root:
   ```
   git rm --cached .env .DS_Store 2>/dev/null
@@ -34,14 +34,14 @@ Back up the `.jks` file and passwords somewhere safe. Without them you cannot up
 
 Build:
 ```
-flutter build appbundle --release --dart-define=API_BASE_URL=https://<your-relay>.workers.dev
+flutter build appbundle --release --dart-define=CONGRESS_API_KEY=<key> --dart-define=OPENSTATES_API_KEY=<key>
 ```
 Upload `build/app/outputs/bundle/release/app-release.aab` in Play Console.
 
 ## 4. iOS
 - [ ] **you** In Xcode, set your Team and signing for the Runner target (bundle ID above).
 - [ ] The location prompt text (`NSLocationWhenInUseUsageDescription`) is written and honest; keep it specific.
-- [ ] `flutter build ipa --release --dart-define=API_BASE_URL=https://<your-relay>.workers.dev`, then upload with Transporter.
+- [ ] `flutter build ipa --release --dart-define=CONGRESS_API_KEY=<key> --dart-define=OPENSTATES_API_KEY=<key>`, then upload with Transporter.
 
 ## 5. Privacy policy
 - [ ] **you** Put your support email into `docs/privacy.html` (replace `SUPPORT_EMAIL_HERE`).

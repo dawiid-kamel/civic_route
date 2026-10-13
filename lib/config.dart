@@ -1,11 +1,13 @@
 /// Build-time settings for CivicRoute.
 ///
 /// Values come from `--dart-define=NAME=value` when you run or build the app,
-/// so nothing secret is stored in the source or in the app bundle. The API
-/// keys themselves live only on the relay in `worker/` (see worker/README.md);
-/// the app just needs to know the relay's address. `services/congress_service`
-/// and `services/state_service` use [AppConfig.apiBaseUrl]; the Results and
-/// Resident hub screens use the remaining values.
+/// so the keys are not stored in the source code. NOTE: the Congress.gov and
+/// Open States keys are compiled into the app and called directly from the
+/// phone (there is no server in between), so anyone who unpacks the app can
+/// read them. Both services issue free keys, so treat them as low-risk and
+/// rotate them if they are abused. `services/congress_service` and
+/// `services/state_service` use the keys; the Results and Resident hub screens
+/// use the remaining values.
 library;
 
 /// Namespace for the build-time settings below; never instantiated.
@@ -13,8 +15,11 @@ class AppConfig {
   /// Private constructor so the class can't be instantiated.
   AppConfig._();
 
-  /// Address of the API relay in `worker/`, e.g. https://civic-route-api.you.workers.dev
-  static const String apiBaseUrl = String.fromEnvironment('API_BASE_URL');
+  /// Congress.gov API key (https://api.congress.gov/sign-up/), used for federal officials.
+  static const String congressApiKey = String.fromEnvironment('CONGRESS_API_KEY');
+
+  /// Open States API key (https://openstates.org/accounts/profile/), used for state legislators.
+  static const String openStatesApiKey = String.fromEnvironment('OPENSTATES_API_KEY');
 
   /// JSON file with the contact directory, fetched at startup so contact
   /// changes ship without an app release. Falls back to the copy bundled in
@@ -42,6 +47,6 @@ class AppConfig {
   /// `--dart-define=ENABLE_ADDRESS_ENTRY=true` to turn address entry back on.
   static const bool enableAddressEntry = bool.fromEnvironment('ENABLE_ADDRESS_ENTRY', defaultValue: false);
 
-  /// True when the relay address was provided.
-  static bool get hasApi => apiBaseUrl.isNotEmpty;
+  /// True when both API keys were provided.
+  static bool get hasApi => congressApiKey.isNotEmpty && openStatesApiKey.isNotEmpty;
 }

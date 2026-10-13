@@ -1,4 +1,4 @@
-/// State legislator lookup via the Open States API (through the API relay).
+/// State legislator lookup via the Open States API (called directly from the app).
 ///
 /// `fetchStateLegislators` takes the user's coordinates and returns the state
 /// senator and representative as `Contact`s; `parseStateLegislators` is the
@@ -19,11 +19,8 @@ const _marylandDirectory = 'https://mgaleg.maryland.gov/mgawebsite/Members/Index
 /// Open States and returns them as [Contact]s.
 Future<List<Contact>> fetchStateLegislators(double lat, double lng) async {
   final data = await getJson(
-    relayUri('openstates/people.geo', {
-      'lat': lat.toString(),
-      'lng': lng.toString(),
-      'include': 'offices',
-    }),
+    openStatesPeopleGeoUri(lat, lng),
+    headers: openStatesHeaders(),
     service: 'Open States',
   );
   return parseStateLegislators(data);

@@ -1,11 +1,11 @@
-/// Federal lookups via the Congress.gov API (through the API relay).
+/// Federal lookups via the Congress.gov API (called directly from the app).
 ///
 /// `fetchFederalReps` returns the House member for a state + district and
 /// `fetchSenators` returns a state's two senators, both as `Contact`s.
 /// `resolver_service.dart` calls them for the `federal_house` and
 /// `federal_senate` levels. Member details are fetched in parallel and cached
-/// in memory, since members rarely change. The API key lives on the relay
-/// (`worker/`), never in the app.
+/// in memory, since members rarely change. The API key comes from the build
+/// (`AppConfig.congressApiKey`).
 library;
 
 import 'package:flutter/foundation.dart';
@@ -33,10 +33,10 @@ String? memberChamber(dynamic member) {
   return lastTerm is Map ? lastTerm['chamber']?.toString() : null;
 }
 
-/// GETs a Congress.gov [path] through the relay and returns the JSON object.
+/// GETs a Congress.gov [path] and returns the JSON object.
 /// Throws an [AppException] if the response is not a JSON object.
 Future<Map<String, dynamic>> _congressGet(String path, Map<String, String> query) async {
-  final data = await getJson(relayUri('congress/$path', query), service: 'Congress.gov');
+  final data = await getJson(congressUri(path, query), service: 'Congress.gov');
   if (data is! Map<String, dynamic>) {
     throw AppException('Congress.gov sent an unexpected response. Please try again later.');
   }

@@ -2,8 +2,8 @@
 ///
 /// `getJson` adds a timeout, turns network failures into one friendly
 /// `OfflineException`, and turns bad status codes into readable messages, so
-/// the screens only ever have to show `error.toString()`. `relayUri` builds
-/// URLs for the API relay in `worker/` (address from `config.dart`).
+/// the screens only ever have to show `error.toString()`. `congressUri` and
+/// `openStatesUri` build the direct API URLs (keys come from `config.dart`).
 /// Used by `congress_service`, `state_service` and `location_service`.
 library;
 
@@ -33,17 +33,41 @@ class OfflineException extends AppException {
       : super("Couldn't reach the lookup service. Check your internet connection and try again.");
 }
 
-/// Builds a URL on the API relay, e.g. `relayUri('congress/member/...')`.
-Uri relayUri(String path, [Map<String, String> query = const {}]) {
-  if (!AppConfig.hasApi) {
+/// Builds a Congress.gov API URL, e.g. `congressUri('member/congress/119/MD')`.
+/// Adds the JSON format and the API key; throws a readable error if the build has no key.
+Uri congressUri(String path, [Map<String, String> query = const {}]) {
+  if (AppConfig.congressApiKey.isEmpty) {
     throw AppException(
-      'This build has no server address. Run the app with '
-      '--dart-define=API_BASE_URL=<your relay URL> (see worker/README.md).',
+      'This build has no Congress.gov key. Run the app with '
+      '--dart-define=CONGRESS_API_KEY=<your key> (see README.md).',
     );
   }
-  final base = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
-  return Uri.parse('$base/$path').replace(queryParameters: query.isEmpty ? null : query);
+  return Uri.https('api.congress.gov', '/v3/$path', {
+    ...query,
+    'format': 'json',
+    'api_key': AppConfig.congressApiKey,
+  });
 }
+
+/// Builds the Open States `people.geo` URL for a point. Coordinates are
+/// rounded to about 100 m, which is plenty for finding districts and sends
+/// less precise location data. Throws a readable error if the build has no key.
+Uri openStatesPeopleGeoUri(double lat, double lng) {
+  if (AppConfig.openStatesApiKey.isEmpty) {
+    throw AppException(
+      'This build has no Open States key. Run the app with '
+      '--dart-define=OPENSTATES_API_KEY=<your key> (see README.md).',
+    );
+  }
+  return Uri.https('v3.openstates.org', '/people.geo', {
+    'lat': lat.toStringAsFixed(3),
+    'lng': lng.toStringAsFixed(3),
+    'include': 'offices',
+  });
+}
+
+/// Request header Open States needs to identify the key.
+Map<String, String> openStatesHeaders() => {'X-API-KEY': AppConfig.openStatesApiKey};
 
 /// GETs [url] and returns the decoded JSON.
 Future<dynamic> getJson(
