@@ -36,10 +36,11 @@ class AppConfig {
   /// doesn't show a section that can never have content.
   static const bool enableLocalAlerts = bool.fromEnvironment('ENABLE_LOCAL_ALERTS');
 
-  /// Whether the "Enter an address" buttons work. Pass
-  /// `--dart-define=ENABLE_ADDRESS_ENTRY=false` to gray them out (the
-  /// "Use my location" option keeps working).
-  static const bool enableAddressEntry = bool.fromEnvironment('ENABLE_ADDRESS_ENTRY', defaultValue: true);
+  /// Whether typing an address is allowed. OFF by default: the "Enter an
+  /// address" buttons are grayed out and the app always uses the device's GPS
+  /// location (any address saved earlier is ignored). Pass
+  /// `--dart-define=ENABLE_ADDRESS_ENTRY=true` to turn address entry back on.
+  static const bool enableAddressEntry = bool.fromEnvironment('ENABLE_ADDRESS_ENTRY', defaultValue: false);
 
   /// True when the relay address was provided.
   static bool get hasApi => apiBaseUrl.isNotEmpty;

@@ -131,7 +131,9 @@ class _HomeScreenState extends State<HomeScreen> {
       double? lng = prefs.getDouble('lng');
 
       // A typed-in address is the user's choice; don't replace it with GPS.
-      if (prefs.getString('location_source') != 'address') {
+      // (When address entry is switched off, any old saved address is ignored
+      // and the device location is always used.)
+      if (!AppConfig.enableAddressEntry || prefs.getString('location_source') != 'address') {
         try {
           final position = await getDeviceLocation();
           lat = position.latitude;

@@ -21,7 +21,7 @@ flutter pub get
 # Deploy the relay first (worker/README.md), then:
 flutter run --dart-define=API_BASE_URL=https://<your-relay>.workers.dev
 ```
-Other optional settings: `DIRECTORY_URL`, `PRIVACY_POLICY_URL`, `ENABLE_LOCAL_ALERTS`, `ENABLE_ADDRESS_ENTRY` (see `lib/config.dart`). Pass `--dart-define=ENABLE_ADDRESS_ENTRY=false` to gray out the "Enter an address" buttons.
+Other optional settings: `DIRECTORY_URL`, `PRIVACY_POLICY_URL`, `ENABLE_LOCAL_ALERTS`, `ENABLE_ADDRESS_ENTRY` (see `lib/config.dart`). Address entry is **off by default**: the "Enter an address" buttons are grayed out and the app always uses the device GPS location. Pass `--dart-define=ENABLE_ADDRESS_ENTRY=true` to turn it back on.
 
 ## Test
 ```
