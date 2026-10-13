@@ -8,6 +8,8 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+/// Records an unexpected [error] (with its [stack], if known). For now this
+/// just logs it to the debug console.
 void reportError(Object error, StackTrace? stack) {
   debugPrint('Unhandled error: $error\n${stack ?? ''}');
   // TODO(release): forward to Sentry.captureException(error, stackTrace: stack)

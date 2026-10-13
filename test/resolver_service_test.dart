@@ -11,6 +11,7 @@ import 'package:civic_route/services/location_service.dart';
 import 'package:civic_route/services/resolver_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Builds a LocationInfo for the given county and state abbreviation (district 1, near Towson, MD).
 LocationInfo _location(String county, String abbr) => LocationInfo(
       county: county,
       state: 'Somewhere',
@@ -21,10 +22,12 @@ LocationInfo _location(String county, String abbr) => LocationInfo(
     );
 
 void main() {
+  /// countyKeyFor combines county and state abbreviation into the directory key.
   test('county key includes the state', () {
     expect(countyKeyFor(_location('Baltimore County', 'MD')), 'Baltimore County, MD');
   });
 
+  /// Baltimore County, MD has a directory and contacts; a same-named county in another state does not.
   test('Baltimore County, MD has contacts; same-named counties elsewhere do not', () async {
     final md = _location('Baltimore County', 'MD');
     expect(hasCountyDirectory(md), isTrue);
@@ -35,6 +38,7 @@ void main() {
     expect(await getContactsForIssue('county', other), isEmpty);
   });
 
+  /// Contacts for the 'county' level are narrowed when an issueId is given.
   test('county contacts are filtered by issue', () async {
     final md = _location('Baltimore County', 'MD');
     final roads = await getContactsForIssue('county', md, issueId: 'local-roads');
@@ -43,6 +47,7 @@ void main() {
     expect(roads.length, lessThan(all.length));
   });
 
+  /// With no congressional district, the federal_house lookup returns an empty list instead of failing.
   test('a missing district skips the House lookup instead of failing', () async {
     final noDistrict = LocationInfo(
       county: 'Baltimore County',
@@ -55,6 +60,7 @@ void main() {
     expect(await getContactsForIssue('federal_house', noDistrict), isEmpty);
   });
 
+  /// Live test of the full pipeline (resolveLocation, then House, Senate and state contacts); skipped without API_BASE_URL.
   test(
     'live: coordinates -> location -> federal and state officials',
     () async {

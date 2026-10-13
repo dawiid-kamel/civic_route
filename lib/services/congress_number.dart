@@ -6,6 +6,10 @@
 /// pick the right congressional-district layer, so neither needs a yearly edit.
 library;
 
+/// Returns the number of the Congress in session on [now] (defaults to today).
+///
+/// Congress #1 began in 1789 and a new one starts every two years. Before
+/// January 3 of an odd year the previous Congress is still sitting.
 int currentCongress([DateTime? now]) {
   final date = now ?? DateTime.now();
   var year = date.year;

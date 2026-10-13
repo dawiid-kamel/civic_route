@@ -8,7 +8,9 @@
 /// Resident hub screens use the remaining values.
 library;
 
+/// Namespace for the build-time settings below; never instantiated.
 class AppConfig {
+  /// Private constructor so the class can't be instantiated.
   AppConfig._();
 
   /// Address of the API relay in `worker/`, e.g. https://civic-route-api.you.workers.dev
@@ -33,6 +35,11 @@ class AppConfig {
   /// Turn on once a real alerts/events feed exists. Off for launch so the app
   /// doesn't show a section that can never have content.
   static const bool enableLocalAlerts = bool.fromEnvironment('ENABLE_LOCAL_ALERTS');
+
+  /// Whether the "Enter an address" buttons work. Pass
+  /// `--dart-define=ENABLE_ADDRESS_ENTRY=false` to gray them out (the
+  /// "Use my location" option keeps working).
+  static const bool enableAddressEntry = bool.fromEnvironment('ENABLE_ADDRESS_ENTRY', defaultValue: true);
 
   /// True when the relay address was provided.
   static bool get hasApi => apiBaseUrl.isNotEmpty;

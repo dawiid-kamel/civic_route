@@ -25,7 +25,10 @@ import '../models/contact.dart';
 import '../services/resolver_service.dart';
 import '../theme.dart';
 
+/// Screen that lists the officials to contact for one [Issue].
+/// Loads on open and shows loading, error, offline and empty states.
 class ResultsScreen extends StatefulWidget {
+  /// The sub-issue being looked up; its `levels` decide which governments are searched.
   final Issue issue;
   ResultsScreen({required this.issue});
 
@@ -33,9 +36,13 @@ class ResultsScreen extends StatefulWidget {
   State<ResultsScreen> createState() => _ResultsScreenState();
 }
 
+/// State for [ResultsScreen]: loads contacts, tracks progress status, favorites and saved state.
 class _ResultsScreenState extends State<ResultsScreen> {
+  /// Officials currently shown on screen, across all levels of government.
   List<Contact> results = [];
+  /// True until the first lookup finishes (or a retry restarts it).
   bool loading = true;
+  /// User-friendly message when the whole lookup failed; null otherwise.
   String? error;
   // Set when some (but not all) levels of government failed to load, so the
   // user still sees the offices that did load plus a note about the rest.
@@ -44,8 +51,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
   DateTime? offlineSavedAt;
   // "County, ST" when we have no hand-checked county offices for the user's county.
   String? unsupportedCounty;
+  /// Keys of starred contacts (see [_contactKey]), mirrored in shared preferences.
   Set<String> favoriteContacts = {};
+  /// The progress step the user picked for this issue; one of [_statusSteps].
   String currentStatus = _statusSteps.first;
+  /// Whether this issue is in the user's saved topics list.
   bool issueSaved = false;
 
   // Progress steps, in order. (These used to overlap with the "Save later" /
@@ -63,6 +73,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
     _load();
   }
 
+  /// Loads saved preferences and the user's location, then fetches officials
+  /// for every level in parallel. Falls back to cached results when offline.
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final savedIds = prefs.getStringList('favorite_contact_ids') ?? [];
@@ -73,6 +85,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
         _statusSteps.contains(storedStatus) ? storedStatus! : _statusSteps.first;
 
     try {
+      // Use the saved coordinates, or ask the device once and remember them.
       var lat = prefs.getDouble('lat');
       var lng = prefs.getDouble('lng');
       if (lat == null || lng == null) {
@@ -82,6 +95,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
         await prefs.setDouble('lat', lat);
         await prefs.setDouble('lng', lng);
       }
+      // Turn the coordinates into a location (county/state) through the cached lookup.
       final loc = await getCachedLocation(lat, lng);
 
       // Every level is looked up at the same time. One failing lookup (e.g.
@@ -146,6 +160,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
     }
   }
 
+  /// Maps an issue level string to one of 'federal', 'state' or 'county'
+  /// for display and for tracking which lookups failed.
   String _levelName(String level) => level.contains('federal')
       ? 'federal'
       : level == 'state'
@@ -163,17 +179,20 @@ class _ResultsScreenState extends State<ResultsScreen> {
     return 'Something went wrong while looking up your officials. Please try again.';
   }
 
+  /// Copies [text] to the clipboard and shows [message] in a snackbar.
   Future<void> _copy(String text, String message) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Short phone script for this issue, used by the "Copy call script" button.
   String get _callScript =>
       'Hello, I am calling about ${widget.issue.name.toLowerCase()}. '
       'Can you tell me the next steps and which office handles this? '
       'I have my dates, address and any case numbers ready.';
 
+  /// Email template for this issue, used by the "Copy email" button.
   String get _emailTemplate =>
       'Subject: Question about ${widget.issue.name}\n\n'
       'Hello,\n\n'
@@ -182,6 +201,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       'Details: [dates, address, case or account numbers]\n\n'
       'Thank you,\n[Your name]\n[Your phone number]';
 
+  /// Clears any error or warning, shows the loading pin and runs the lookup again.
   Future<void> _retry() async {
     setState(() {
       loading = true;
@@ -192,9 +212,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
     await _load();
   }
 
+  /// Identifies a contact in the favorites list by level, name and office.
   String _contactKey(Contact contact) =>
       '${contact.level}|${contact.name}|${contact.office}';
 
+  /// Stars or unstars [contact] and saves the updated favorites list.
   Future<void> _toggleFavorite(Contact contact) async {
     final prefs = await SharedPreferences.getInstance();
     final key = _contactKey(contact);
@@ -208,6 +230,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
     await prefs.setStringList('favorite_contact_ids', updated.toList());
   }
 
+  /// Records the chosen progress [status] for this issue and updates the
+  /// follow-up reminder to match.
   Future<void> _setStatus(String status) async {
     final prefs = await SharedPreferences.getInstance();
     setState(() => currentStatus = status);
@@ -223,6 +247,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     }
   }
 
+  /// Adds or removes this issue from the saved topics list and updates the button.
   Future<void> _toggleIssueSaved() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = List<String>.from(prefs.getStringList('saved_issues') ?? []);
@@ -249,6 +274,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
           style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w800),
         ),
       ),
+      // Loading pin first, then the error view with a retry button, then the results list.
       body: loading
           ? _loadingPin(colors)
           : error != null
@@ -289,6 +315,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   ),
                 if (partialWarning != null) _warningCard(colors, partialWarning!),
                 if (unsupportedCounty != null) _unsupportedCountyCard(colors, unsupportedCounty!),
+                // Show the empty-state card only when there is no unsupported-county card either.
                 if (results.isEmpty && unsupportedCounty == null)
                   _emptyResultsCard(colors)
                 else
@@ -316,6 +343,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// The "What to do next" card: who usually handles this, the recommended
+  /// office, a short script, copy buttons and a Save button.
   Widget _summaryCard(AppColors colors) {
     final recommended = _recommended;
     return Container(
@@ -415,6 +444,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// Card with a chip for each progress step so the user can track this issue.
   Widget _statusCard(AppColors colors) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -460,6 +490,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// Card shown when there is no county directory for [county], with fallback links
+  /// to USA.gov and 211.
   Widget _unsupportedCountyCard(AppColors colors, String county) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -512,6 +544,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// Small reminder that contact information can change.
   Widget _disclaimer(AppColors colors) {
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 12),
@@ -523,6 +556,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// Highlighted notice card showing [message] (offline or partial-load warnings).
   Widget _warningCard(AppColors colors, String message) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -547,6 +581,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// Card shown when no contacts were found for this issue.
   Widget _emptyResultsCard(AppColors colors) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -583,6 +618,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// Centered loading indicator with a location pin shown while officials load.
   Widget _loadingPin(AppColors colors) {
     return Center(
       child: Column(
@@ -615,7 +651,10 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  /// Card for one official: name, office, level badge, call/website/email buttons,
+  /// a favorite star, a copy button and the last-verified date.
   Widget _contactCard(Contact c, AppColors colors) {
+    // Badge color by government level; anything not federal or state is treated as county.
     final levelColor = c.level == 'federal'
         ? colors.federal
         : c.level == 'state'
@@ -761,6 +800,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
               ],
             ),
             SizedBox(height: 4),
+            // Secondary actions: Website and Email only appear here when another button
+            // already took the primary slot above.
             Wrap(
               spacing: 8,
               children: [

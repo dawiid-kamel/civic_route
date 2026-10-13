@@ -21,12 +21,16 @@ import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
 import 'theme.dart';
 
+/// Starts the app: sets up error reporting, loads data and reminders, picks the
+/// first screen from saved preferences, and runs the [MaterialApp].
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Send Flutter framework errors to the console and to our error reporter.
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     reportError(details.exception, details.stack);
   };
+  // Catch uncaught async/platform errors too; returning true marks them handled.
   PlatformDispatcher.instance.onError = (error, stack) {
     reportError(error, stack);
     return true;
@@ -43,6 +47,7 @@ Future<void> main() async {
   final tutorialSeen = prefs.getBool('tutorial_seen') ?? false;
   final onboarded = prefs.getBool('onboarded') ?? false;
 
+  // Decide where to start: tutorial, then onboarding, then home.
   Widget startScreen;
   if (!tutorialSeen) {
     startScreen = TutorialScreen();
@@ -56,6 +61,7 @@ Future<void> main() async {
     navigatorKey: ReminderService.navigatorKey,
     title: 'Civic Route',
     themeMode: ThemeMode.system,
+    // Light theme built from the light palette.
     theme: ThemeData(
       primaryColor: AppColors.light.brandPrimary,
       scaffoldBackgroundColor: AppColors.light.surface,
@@ -69,6 +75,7 @@ Future<void> main() async {
         titleTextStyle: TextStyle(color: AppColors.light.brandPrimary, fontWeight: FontWeight.w800, fontSize: 18),
       ),
     ),
+    // Dark theme built from the dark palette.
     darkTheme: ThemeData(
       primaryColor: AppColors.dark.brandPrimary,
       // Previously a different, unrelated hardcoded navy (0xFF0B1220) than

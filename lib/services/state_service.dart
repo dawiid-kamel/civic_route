@@ -12,8 +12,11 @@ library;
 import '../models/contact.dart';
 import 'api_client.dart';
 
+/// Fallback page listing every Maryland General Assembly member, used when a legislator has no website.
 const _marylandDirectory = 'https://mgaleg.maryland.gov/mgawebsite/Members/Index';
 
+/// Finds the state legislators who represent the point ([lat], [lng]) through
+/// Open States and returns them as [Contact]s.
 Future<List<Contact>> fetchStateLegislators(double lat, double lng) async {
   final data = await getJson(
     relayUri('openstates/people.geo', {

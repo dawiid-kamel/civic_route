@@ -12,19 +12,32 @@
  * cheap on the upstream rate limits. Nothing is logged or stored by this code.
  */
 
+/**
+ * Allow-list of Congress.gov paths (after `/congress/`) the relay will forward.
+ * Anything that matches none of these patterns is rejected with a 400.
+ */
 const CONGRESS_PATHS = [
   /^member\/congress\/\d{2,3}\/[A-Za-z]{2}$/,         // all members of a state
   /^member\/congress\/\d{2,3}\/[A-Za-z]{2}\/\d{1,2}$/, // one district
   /^member\/[A-Za-z]\d{6}$/,                          // one member (bioguide id)
 ];
+/** Query parameters copied from the app's request to Congress.gov; all others are dropped. */
 const CONGRESS_QUERY = ['currentMember', 'limit', 'offset', 'format'];
 
+/** CORS headers added to every response; the relay is read-only (GET and OPTIONS). */
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+/**
+ * Builds a JSON Response with CORS headers.
+ * @param {string|object} body Already-serialized string, or an object to JSON-encode.
+ * @param {number} [status=200] HTTP status code.
+ * @param {Record<string,string>} [extra={}] Additional headers (e.g. Cache-Control).
+ * @returns {Response}
+ */
 function reply(body, status = 200, extra = {}) {
   return new Response(typeof body === 'string' ? body : JSON.stringify(body), {
     status,
@@ -32,6 +45,11 @@ function reply(body, status = 200, extra = {}) {
   });
 }
 
+/**
+ * Worker entry point. Handles CORS preflight, rejects non-GET methods, and routes
+ * `/congress/...` and `/openstates/people.geo` to the upstream APIs, adding the
+ * secret keys server-side. Any other path returns 404.
+ */
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -76,6 +94,13 @@ export default {
   },
 };
 
+/**
+ * Fetches an upstream URL through Cloudflare's edge cache and relays the result.
+ * @param {URL} upstream Fully built upstream URL (may include the API key).
+ * @param {Record<string,string>} headers Extra request headers (e.g. X-API-KEY).
+ * @param {number} ttl Edge cache lifetime in seconds; also sent to the app as max-age on success.
+ * @returns {Promise<Response>} Upstream body and status, or a 502 JSON error if the fetch throws.
+ */
 async function forward(upstream, headers, ttl) {
   try {
     const res = await fetch(upstream.toString(), {

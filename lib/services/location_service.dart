@@ -14,8 +14,12 @@ import 'package:flutter/foundation.dart';
 import '../models/location_info.dart';
 import 'api_client.dart';
 
+/// Error text used when the Census geocoder has no U.S. data for the point.
 const _notInUs = "These coordinates don't appear to be inside the United States.";
 
+/// Asks the Census geocoder which county, state and congressional district
+/// contain the coordinates. Throws an [AppException] if they are out of range,
+/// outside the U.S., or the service can't be reached.
 Future<LocationInfo> resolveLocation(double lat, double lng) async {
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     throw AppException('Those coordinates are out of range.');
@@ -86,6 +90,8 @@ LocationInfo parseCensusResponse(dynamic data, double lat, double lng) {
   );
 }
 
+/// One geocoding result: its coordinates plus the address text that matched
+/// (shown as a suggestion in the address picker).
 typedef AddressMatch = ({double lat, double lng, String matched});
 
 /// Looks up a street address and returns every match the Census geocoder
@@ -150,6 +156,8 @@ Future<AddressMatch> geocodeAddress(String address) async {
       AppException("We couldn't find that address. Check the spelling and include the city and state.");
 }
 
+/// Searches OpenStreetMap's Nominatim for [address] (U.S. only, best match
+/// only). Used as the fallback when the Census geocoder finds nothing.
 Future<List<AddressMatch>> _searchNominatim(String address) async {
   final url = Uri.https('nominatim.openstreetmap.org', '/search', {
     'q': address.trim(),

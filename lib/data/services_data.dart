@@ -19,10 +19,14 @@ import 'county_data.dart';
 /// names/icons) — so the two screens quietly disagreed with each other.
 /// It now lives in one place and both screens read from it.
 class HubService {
+  /// Short name shown on the tile; also the lookup key in the county service directory.
   final String title;
+  /// One-line hint about what the service covers.
   final String subtitle;
+  /// Icon shown on the tile.
   final IconData icon;
 
+  /// Creates a service shortcut; all fields are required.
   const HubService({
     required this.title,
     required this.subtitle,
@@ -30,6 +34,8 @@ class HubService {
   });
 }
 
+/// The service shortcuts, in display order. The `title` doubles as the key into
+/// `countyServiceDirectory`, so the two must be kept in sync.
 const List<HubService> hubServices = [
   HubService(
     title: 'City services',

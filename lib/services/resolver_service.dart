@@ -19,9 +19,13 @@ import 'location_service.dart';
 import 'state_service.dart';
 import '../data/county_data.dart';
 
+/// The most recently resolved location, kept in memory for this app session.
 LocationInfo? _memoryLocation;
+/// The [_locationKey] that [_memoryLocation] was resolved for.
 String? _memoryKey;
 
+/// Rounds coordinates to 3 decimals (~100 m) so tiny GPS jitter reuses the
+/// same cached answer.
 String _locationKey(double lat, double lng) =>
     '${lat.toStringAsFixed(3)},${lng.toStringAsFixed(3)}';
 
@@ -66,6 +70,9 @@ String countyKeyFor(LocationInfo location) => '${location.county}, ${location.st
 bool hasCountyDirectory(LocationInfo location) =>
     (countyDictionary[countyKeyFor(location)] ?? const []).isNotEmpty;
 
+/// Returns the officials for one government [level] at [location]. For the
+/// county level, [issueId] narrows the list to offices relevant to that issue;
+/// an unknown level gives an empty list.
 Future<List<Contact>> getContactsForIssue(String level, LocationInfo location, {String? issueId}) async {
   switch (level) {
     case 'federal_house':

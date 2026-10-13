@@ -36,6 +36,9 @@ import '../models/contact.dart';
 // Results only shows what's relevant to the issue you're actually viewing.
 // Leave it empty for general/countywide offices that should show up
 // regardless of which county issue you're viewing.
+/// County offices keyed by "County, ST" (e.g. "Baltimore County, MD"). Each value
+/// is the list of [Contact]s for that county; directory_service can replace
+/// entries at runtime. Entries are grouped below by the issue they serve.
 final Map<String, List<Contact>> countyDictionary = {
   "Baltimore County, MD": [
     // General / countywide — show for every county-level issue.
@@ -216,17 +219,23 @@ List<Contact> _pick(String county, List<String> names) {
 // - 211 Maryland is the state's free referral line for local help programs.
 // The Department of Aging has no phone listed because the published numbers
 // disagree; its page links to every senior center's own number.
+/// Offices for each Resident hub service shortcut, shaped as
+/// county key -> service title (matching `hubServices`) -> contacts. Many entries
+/// reuse [countyDictionary] via [_pick]; the rest are defined here.
 Map<String, Map<String, List<Contact>>> get countyServiceDirectory => {
   "Baltimore County, MD": {
+    // City services: everyday county help lines.
     "City services": _pick("Baltimore County, MD", [
       "BaltCo 311",
       "Bureau of Highways",
       "Bureau of Solid Waste Management",
     ]),
+    // Permits: building, zoning and inspections.
     "Permits": _pick("Baltimore County, MD", [
       "Permits, Approvals and Inspections",
       "Baltimore County Department of Planning",
     ]),
+    // Utilities: power, gas and water billing.
     "Utilities": [
       Contact(
         lastVerified: "2026-09",
@@ -253,6 +262,7 @@ Map<String, Map<String, List<Contact>>> get countyServiceDirectory => {
         level: "local",
       ),
     ],
+    // Public records: records requests and meetings.
     "Public records": [
       Contact(
         lastVerified: "2026-09",
@@ -263,6 +273,7 @@ Map<String, Map<String, List<Contact>>> get countyServiceDirectory => {
       ),
       ..._pick("Baltimore County, MD", ["Baltimore County Council"]),
     ],
+    // Transit info: local buses, light rail and Metro.
     "Transit info": [
       Contact(
         lastVerified: "2026-09",
@@ -273,6 +284,7 @@ Map<String, Map<String, List<Contact>>> get countyServiceDirectory => {
         level: "state",
       ),
     ],
+    // County offices: the main elected and administrative offices.
     "County offices": _pick("Baltimore County, MD", [
       "Kathy Klausmeier",
       "Baltimore County Council",
@@ -280,6 +292,7 @@ Map<String, Map<String, List<Contact>>> get countyServiceDirectory => {
       "Baltimore County Board of Elections",
       "MD SDAT — Baltimore County Assessments",
     ]),
+    // Community programs: local help and referral services.
     "Community programs": [
       Contact(
         lastVerified: "2026-09",

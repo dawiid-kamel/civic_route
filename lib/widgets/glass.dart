@@ -9,14 +9,23 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+/// A rounded card that blurs what is behind it and adds a see-through tint,
+/// giving the frosted-glass look on top of the gradient backdrop.
 class GlassContainer extends StatelessWidget {
+  /// Content shown on top of the glass.
   final Widget child;
+  /// Space between the glass edge and [child].
   final EdgeInsetsGeometry padding;
+  /// Corner radius of the card, also used to clip the blur.
   final double radius;
+  /// How strong the tint is, from 0 (clear) to 1 (solid).
   final double opacity;
+  /// Base color of the glass; white by default.
   final Color tint;
+  /// Optional custom border; when null a faint white outline is drawn.
   final BoxBorder? border;
 
+  /// Creates a frosted-glass card around [child].
   const GlassContainer({
     super.key,
     required this.child,
@@ -27,6 +36,7 @@ class GlassContainer extends StatelessWidget {
     this.border,
   });
 
+  /// Clips to rounded corners, blurs the backdrop, then paints the tinted box.
   @override
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(radius);

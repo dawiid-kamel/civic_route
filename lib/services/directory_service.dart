@@ -18,6 +18,7 @@ import '../data/county_data.dart';
 import '../models/contact.dart';
 import 'api_client.dart';
 
+/// SharedPreferences key under which the last downloaded directory JSON is saved.
 const _prefsKey = 'directory_cache';
 
 /// Applies a decoded directory JSON. Returns the number of counties applied

@@ -9,13 +9,19 @@ A Flutter app that answers "who do I actually call?" Pick an issue (housing, tra
 
 Local county coverage is currently **Baltimore County, MD**. Other counties get federal and state officials plus a fallback to USA.gov and 211.
 
+## Follow-up reminders
+Marking an issue **Contacted** or **Waiting for a response** on the Results screen schedules a local notification 3 days later ("Any update on ...?"). Tapping it opens that issue. Marking it **Resolved** or **Not started** cancels it, and the "Issue reminders" switch in the Resident hub turns reminders on or off. Android and iOS only; everything stays on the device (`lib/services/reminder_service.dart`).
+
+## Address picker
+"Enter an address" (`lib/widgets/address_dialog.dart`) shows matching addresses from the Census geocoder as you type; tap one to use it. If you submit text the Census service can't find, the app falls back to OpenStreetMap Nominatim.
+
 ## Run it
 ```
 flutter pub get
 # Deploy the relay first (worker/README.md), then:
 flutter run --dart-define=API_BASE_URL=https://<your-relay>.workers.dev
 ```
-Other optional settings: `DIRECTORY_URL`, `PRIVACY_POLICY_URL`, `ENABLE_LOCAL_ALERTS` (see `lib/config.dart`).
+Other optional settings: `DIRECTORY_URL`, `PRIVACY_POLICY_URL`, `ENABLE_LOCAL_ALERTS`, `ENABLE_ADDRESS_ENTRY` (see `lib/config.dart`). Pass `--dart-define=ENABLE_ADDRESS_ENTRY=false` to gray out the "Enter an address" buttons.
 
 ## Test
 ```

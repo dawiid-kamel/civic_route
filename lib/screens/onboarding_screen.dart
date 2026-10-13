@@ -9,19 +9,26 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config.dart';
 import '../services/device_location_service.dart';
 import '../theme.dart';
 import '../widgets/address_dialog.dart';
 import 'home_screen.dart';
 
+/// Screen that asks the user to share a location (GPS or address) or skip.
 class OnboardingScreen extends StatefulWidget {
+  /// Creates the state object for this screen.
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
+/// State for [OnboardingScreen]; tracks whether a location request is running.
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  /// True while the GPS lookup runs, to show a spinner and disable the buttons.
   bool busy = false;
 
+  /// Gets the device's GPS position, saves it, marks onboarding done and opens
+  /// [HomeScreen]. On failure it shows a snackbar and lets the user try again.
   Future<void> useLocation() async {
     setState(() => busy = true);
     try {
@@ -41,6 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
+  /// Lets the user type an address instead; if one is saved, finishes onboarding.
   Future<void> useAddress() async {
     final saved = await promptForAddress(context);
     if (!saved || !mounted) return;
@@ -50,6 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen()));
   }
 
+  /// Finishes onboarding without a location so the user is never stuck here.
   Future<void> _skip() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarded', true);
@@ -57,6 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen()));
   }
 
+  /// Builds the navy header with the pitch and a content panel with the buttons.
   @override
   Widget build(BuildContext context) {
     // The hero header is a fixed brand-navy backdrop by design (same as
@@ -129,7 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     SizedBox(height: 8),
                     OutlinedButton(
-                      onPressed: busy ? null : useAddress,
+                      onPressed: (busy || !AppConfig.enableAddressEntry) ? null : useAddress,
                       style: OutlinedButton.styleFrom(minimumSize: Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                       child: Text('Enter an address instead', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
@@ -151,6 +161,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  /// One row in the panel: a round icon badge next to a sentence of explanation.
   Widget _point(IconData icon, String text, AppColors colors) {
     return Row(children: [
       Container(

@@ -7,6 +7,8 @@ import 'package:civic_route/services/location_service.dart';
 import 'package:civic_route/services/state_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Builds a fake Census geocoder response with one state, one county and (optionally) a
+/// congressional district under the given layer/field names.
 Map<String, dynamic> _census({String layer = '119th Congressional Districts', String field = 'CD119', String cd = '02', bool withDistrict = true}) => {
       'result': {
         'geographies': {
@@ -25,7 +27,9 @@ Map<String, dynamic> _census({String layer = '119th Congressional Districts', St
     };
 
 void main() {
+  // parseCensusResponse: turns a Census geographies response into a LocationInfo.
   group('parseCensusResponse', () {
+    /// Reads county, state name, state abbreviation and district (leading zero stripped).
     test('reads county, state and district', () {
       final loc = parseCensusResponse(_census(), 39.4, -76.6);
       expect(loc.county, 'Baltimore County');
@@ -34,6 +38,7 @@ void main() {
       expect(loc.congressionalDistrict, '2'); // leading zero removed
     });
 
+    /// The district is found by layer name, so a newer Congress (CD120) works unchanged.
     test('works for a later Congress without any code change', () {
       final loc = parseCensusResponse(
         _census(layer: '120th Congressional Districts', field: 'CD120', cd: '07'),
@@ -43,17 +48,20 @@ void main() {
       expect(loc.congressionalDistrict, '7');
     });
 
+    /// With no district layer the district is null, but the county is still read.
     test('a missing district layer leaves the district null', () {
       final loc = parseCensusResponse(_census(withDistrict: false), 39.4, -76.6);
       expect(loc.congressionalDistrict, isNull);
       expect(loc.county, 'Baltimore County');
     });
 
+    /// A positive longitude (east of Greenwich) keeps its sign.
     test('does not flip the sign of a positive longitude', () {
       final loc = parseCensusResponse(_census(), 13.4, 144.7); // Guam-like input
       expect(loc.lng, 144.7);
     });
 
+    /// Responses with no geographies, or null, throw an AppException (location outside the US).
     test('rejects locations outside the US with a friendly message', () {
       expect(
         () => parseCensusResponse({'result': {'geographies': {}}}, 0, 0),
@@ -63,6 +71,7 @@ void main() {
     });
   });
 
+  // parseStateLegislators: turns an Open States people.geo response into Contact objects.
   group('parseStateLegislators', () {
     final response = {
       'results': [
@@ -89,18 +98,21 @@ void main() {
       ],
     };
 
+    /// Entries whose jurisdiction is not 'state' (e.g. a federal person) are dropped.
     test('keeps only state-level people', () {
       final contacts = parseStateLegislators(response);
       expect(contacts.map((c) => c.name), ['Jane Senator', 'Sam Delegate']);
       expect(contacts.every((c) => c.level == 'state'), isTrue);
     });
 
+    /// Phone and address come from the first office entry.
     test('pulls phone and address from offices', () {
       final jane = parseStateLegislators(response).first;
       expect(jane.phone, '410-841-3000');
       expect(jane.address, contains('Bladen'));
     });
 
+    /// An email address goes to email; a URL goes to website; with an email, the Maryland site is the website fallback.
     test('sorts email addresses and links into the right fields', () {
       final contacts = parseStateLegislators(response);
       expect(contacts[0].email, 'jane@mgaleg.maryland.gov');
@@ -109,17 +121,21 @@ void main() {
       expect(contacts[1].email, isNull);
     });
 
+    /// Null, null results, or an empty map produce an empty list.
     test('handles empty or malformed responses', () {
       expect(parseStateLegislators(null), isEmpty);
       expect(parseStateLegislators({'results': null}), isEmpty);
       expect(parseStateLegislators({}), isEmpty);
     });
   });
+  // parseAddressMatches: turns a Census address-search response into candidate matches.
   group('parseAddressMatches', () {
+    /// Wraps a list of address matches in the Census response shape.
     Map<String, dynamic> response(List<Map<String, dynamic>> matches) => {
           'result': {'addressMatches': matches},
         };
 
+    /// Every match with coordinates is returned in order, with matched text, lat (y) and lng (x).
     test('returns every match with coordinates, best first', () {
       final matches = parseAddressMatches(
         response([
@@ -134,6 +150,7 @@ void main() {
       expect(matches.first.lng, -76.6);
     });
 
+    /// Matches whose coordinates are null are skipped.
     test('skips entries without usable coordinates', () {
       final matches = parseAddressMatches(
         response([
@@ -145,6 +162,7 @@ void main() {
       expect(matches.map((m) => m.matched), ['GOOD']);
     });
 
+    /// Null, empty, or missing results produce an empty list.
     test('handles empty or malformed responses', () {
       expect(parseAddressMatches(null, 'x'), isEmpty);
       expect(parseAddressMatches({}, 'x'), isEmpty);
@@ -152,7 +170,9 @@ void main() {
     });
   });
 
+  // parseNominatimMatches: turns an OpenStreetMap Nominatim result list into candidate matches.
   group('parseNominatimMatches', () {
+    /// Coordinates given as strings are parsed; entries with unparseable coordinates are skipped.
     test('reads string coordinates and skips bad entries', () {
       final matches = parseNominatimMatches([
         {'lat': '39.4015', 'lon': '-76.6019', 'display_name': 'Towson, MD'},
@@ -164,6 +184,7 @@ void main() {
       expect(matches.first.matched, 'Towson, MD');
     });
 
+    /// Null or a non-list value produces an empty list.
     test('handles malformed responses', () {
       expect(parseNominatimMatches(null, 'x'), isEmpty);
       expect(parseNominatimMatches({'a': 1}, 'x'), isEmpty);

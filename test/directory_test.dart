@@ -11,6 +11,8 @@ import 'package:civic_route/util/format.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  /// The hosted data/county_directory.json parses, has as many Baltimore County entries as the bundled
+  /// list, and every contact has a phone or website and a lastVerified date.
   test('data/county_directory.json is valid and matches the bundled Baltimore County list', () {
     final json = jsonDecode(File('data/county_directory.json').readAsStringSync()) as Map<String, dynamic>;
     final list = (json['counties'] as Map<String, dynamic>)['Baltimore County, MD'] as List;
@@ -22,6 +24,8 @@ void main() {
     }
   });
 
+  /// applyDirectory replaces/adds a county, skips malformed entries, returns the number of
+  /// counties applied, and leaves other counties untouched.
   test('applyDirectory replaces a county and skips bad entries', () {
     final before = Map.of(countyDictionary);
     addTearDown(() => countyDictionary
@@ -41,11 +45,13 @@ void main() {
     expect(countyDictionary['Baltimore County, MD'], isNotEmpty); // untouched
   });
 
+  /// applyDirectory returns 0 for null or wrongly shaped input.
   test('applyDirectory ignores unusable data', () {
     expect(applyDirectory(null), 0);
     expect(applyDirectory({'counties': 'nope'}), 0);
   });
 
+  /// A Contact encoded to JSON and decoded again is identical, and its share text includes the phone.
   test('Contact survives a JSON round trip', () {
     final c = Contact(
       name: 'A',
@@ -63,6 +69,7 @@ void main() {
     expect(copy.toShareText(), contains('Phone: 1'));
   });
 
+  /// formatVerified turns 'YYYY-MM' or 'YYYY-MM-DD' into 'Mon YYYY' and returns null for bad or missing input.
   test('formatVerified', () {
     expect(formatVerified('2026-09'), 'Sep 2026');
     expect(formatVerified('2026-09-30'), 'Sep 2026');

@@ -17,7 +17,9 @@ import '../config.dart';
 
 /// An error whose message is safe to show to the user as-is.
 class AppException implements Exception {
+  /// The user-facing text; also what `toString()` returns.
   final String message;
+  /// Creates an exception carrying a message that is safe to show on screen.
   AppException(this.message);
 
   @override
@@ -26,6 +28,7 @@ class AppException implements Exception {
 
 /// The device is offline, or the service didn't answer in time.
 class OfflineException extends AppException {
+  /// Creates the standard "check your connection" error.
   OfflineException()
       : super("Couldn't reach the lookup service. Check your internet connection and try again.");
 }

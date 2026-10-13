@@ -9,6 +9,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+/// Opens [uri] in the matching external app (dialer, mail, browser). If the
+/// device can't handle it, shows a snackbar on [context] so the tap isn't silent.
 Future<void> openLink(BuildContext context, Uri uri) async {
   var ok = false;
   try {
@@ -23,4 +25,6 @@ Future<void> openLink(BuildContext context, Uri uri) async {
   }
 }
 
+/// Builds a `tel:` link from a display phone number, keeping only digits and
+/// a leading `+` so formats like "(410) 555-1234" still dial.
 Uri phoneUri(String phone) => Uri.parse('tel:${phone.replaceAll(RegExp(r'[^\d+]'), '')}');

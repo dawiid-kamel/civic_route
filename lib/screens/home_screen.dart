@@ -25,21 +25,32 @@ import 'category_screen.dart';
 import 'results_screen.dart';
 import 'resident_hub_screen.dart';
 
+/// The app's landing page: category search, saved topics, dashboard and alerts.
 class HomeScreen extends StatefulWidget {
+  /// Creates the mutable state that holds saved lists, location and search text.
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// State for [HomeScreen]: loads location and saved data, and builds the page.
 class _HomeScreenState extends State<HomeScreen> {
+  /// Text shown in the location chip; becomes "County, State" once resolved.
   String locationLabel = 'Your location';
+  /// Drives the search box so the category grid can filter as the user types.
   final TextEditingController _searchController = TextEditingController();
+  /// Ids of categories the user bookmarked (persisted in SharedPreferences).
   List<String> savedCategories = [];
+  /// Ids of individual issues the user bookmarked from the results screen.
   List<String> savedIssues = [];
+  /// Up to three most recently opened category ids, newest first.
   List<String> recentCategories = [];
+  /// Whether the user wants the "Local alerts" section shown (hub switch).
   bool alertsEnabled = true;
+  /// Message explaining missing local-office coverage, or null when covered.
   // Shown when the user's county has no hand-checked local offices yet.
   String? coverageNote;
 
+  /// Kicks off the location lookup and loads saved state when the screen opens.
   @override
   void initState() {
     super.initState();
@@ -47,12 +58,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadSavedState();
   }
 
+  /// Releases the search controller when the screen goes away.
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
+  /// Reads saved, recent and alert-setting values from SharedPreferences into state.
   Future<void> _loadSavedState() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -67,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Adds or removes a category from the saved list and persists the change.
   Future<void> _toggleSaved(String categoryId) async {
     final prefs = await SharedPreferences.getInstance();
     final updated = List<String>.from(savedCategories);
@@ -79,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setStringList('saved_categories', updated);
   }
 
+  /// Opens a category screen and records it as recently viewed.
   // Saving an issue happens two screens deep (Results), so reload the saved
   // lists whenever we come back to Home.
   void _openCategory(IssueCategory cat) {
@@ -88,12 +103,14 @@ class _HomeScreenState extends State<HomeScreen> {
         .then((_) => _loadSavedState());
   }
 
+  /// Opens the results screen for a single saved issue, then refreshes saved state.
   void _openIssue(Issue issue) {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => ResultsScreen(issue: issue)))
         .then((_) => _loadSavedState());
   }
 
+  /// Moves a category to the front of the recent list (max three) and saves it.
   Future<void> _trackRecent(String categoryId) async {
     final prefs = await SharedPreferences.getInstance();
     final updated = List<String>.from(recentCategories);
@@ -104,6 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await prefs.setStringList('recent_categories', trimmed);
   }
 
+  /// Works out the user's county/state label and whether local offices are covered.
+  ///
+  /// Uses GPS unless the user typed an address, falling back to the last saved position.
   Future<void> _loadLocation() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -168,7 +188,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.edit_location_alt_outlined, color: Colors.white),
                 title: Text('Enter an address', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                onTap: () => Navigator.pop(context, 'address'),
+                // Grayed out when address entry is switched off (see AppConfig.enableAddressEntry).
+                enabled: AppConfig.enableAddressEntry,
+                onTap: AppConfig.enableAddressEntry ? () => Navigator.pop(context, 'address') : null,
               ),
             ],
           ),
@@ -193,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Shows a bottom sheet listing recently viewed categories, tappable to reopen.
   void _showRecentSheet() {
     final names = recentCategories
         .map((id) {
@@ -240,6 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Categories matching the search text (name, description or sub-issues), or all when empty.
   List<IssueCategory> get filteredCategories {
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return issueTree;
@@ -255,6 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  /// Builds the scrolling home page: header, search, saved topics, dashboard, alerts and grid.
   @override
   Widget build(BuildContext context) {
     // Previously this was a second, hand-maintained copy of the "local
@@ -612,6 +637,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Small info card showing [coverageNote] when local offices are not built in yet.
   Widget _coverageNoteCard() {
     return Container(
       width: double.infinity,
@@ -649,6 +675,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .whereType<Issue>()
         .toList();
 
+    // Builds one tappable saved-topic row (category or issue).
     Widget row(IconData icon, String title, String kind, VoidCallback onTap) {
       return Semantics(
         button: true,
@@ -739,9 +766,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+/// Tile in the horizontal services strip, showing an icon, title and short subtitle.
 class _ServiceTile extends StatelessWidget {
+  /// Service name; also used to open the matching section of the hub.
   final String title;
+  /// One-line description shown under the title.
   final String subtitle;
+  /// Icon representing the service.
   final IconData icon;
 
   const _ServiceTile({
@@ -750,6 +781,7 @@ class _ServiceTile extends StatelessWidget {
     required this.icon,
   });
 
+  /// Builds the tile with a semantics label for screen readers.
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -797,9 +829,13 @@ class _ServiceTile extends StatelessWidget {
   }
 }
 
+/// Card for a single local alert or event (none are shown until a feed exists).
 class _AlertCard extends StatelessWidget {
+  /// Short headline of the alert.
   final String title;
+  /// Longer description of the alert.
   final String body;
+  /// Icon shown at the left of the card.
   final IconData icon;
 
   const _AlertCard({
@@ -808,6 +844,7 @@ class _AlertCard extends StatelessWidget {
     required this.icon,
   });
 
+  /// Builds the alert card with a combined semantics label.
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -859,6 +896,7 @@ class _AlertCard extends StatelessWidget {
 class _EmptyAlertsCard extends StatelessWidget {
   const _EmptyAlertsCard();
 
+  /// Builds the empty-state card with a semantics label.
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -906,10 +944,15 @@ class _EmptyAlertsCard extends StatelessWidget {
   }
 }
 
+/// Small stat tile on the dashboard (saved count, recent count, services).
 class _DashboardCard extends StatelessWidget {
+  /// Caption above the value.
   final String label;
+  /// Headline number or text for the tile.
   final String value;
+  /// Icon at the top of the tile.
   final IconData icon;
+  /// Optional tap handler; when null the tile is not tappable.
   final VoidCallback? onTap;
 
   const _DashboardCard({
@@ -919,6 +962,7 @@ class _DashboardCard extends StatelessWidget {
     this.onTap,
   });
 
+  /// Builds the tile and wraps it in a button only when [onTap] is set.
   @override
   Widget build(BuildContext context) {
     final card = Container(
@@ -964,10 +1008,15 @@ class _DashboardCard extends StatelessWidget {
   }
 }
 
+/// One tile in the category grid with a press animation and a bookmark button.
 class _CategoryCard extends StatefulWidget {
+  /// The issue category this card displays.
   final IssueCategory cat;
+  /// Whether the category is currently bookmarked.
   final bool saved;
+  /// Called when the bookmark button is tapped.
   final VoidCallback onToggleSave;
+  /// Called when the card itself is tapped.
   final VoidCallback onOpen;
 
   _CategoryCard({
@@ -977,13 +1026,17 @@ class _CategoryCard extends StatefulWidget {
     required this.onOpen,
   });
 
+  /// Creates the state that tracks the pressed (shrunk) look.
   @override
   State<_CategoryCard> createState() => _CategoryCardState();
 }
 
+/// State for [_CategoryCard].
 class _CategoryCardState extends State<_CategoryCard> {
+  /// True while a finger is down, which shrinks the card slightly.
   bool pressed = false;
 
+  /// Builds the card with its icon, bookmark button, name and description.
   @override
   Widget build(BuildContext context) {
     final cat = widget.cat;

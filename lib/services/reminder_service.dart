@@ -25,6 +25,7 @@ import '../data/issue_tree.dart';
 import '../models/issue.dart';
 import '../screens/results_screen.dart';
 
+/// Static helpers for scheduling and cancelling issue follow-up notifications.
 class ReminderService {
   ReminderService._();
 

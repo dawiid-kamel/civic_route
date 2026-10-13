@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:civic_route/screens/home_screen.dart';
 
 void main() {
+  /// HomeScreen shows the dashboard heading and search field, no quick-search chips, and no 'Local alerts' section.
   testWidgets('HomeScreen shows dashboard and search, and hides the unfinished alerts section', (WidgetTester tester) async {
     // HomeScreen reads SharedPreferences; without a mock the plugin call fails in tests.
     SharedPreferences.setMockInitialValues({});
@@ -25,6 +26,7 @@ void main() {
     expect(find.text('Local alerts'), findsNothing);
   });
 
+  /// Saved categories and issues in SharedPreferences appear under 'Saved topics'.
   testWidgets('HomeScreen lists saved topics for quick access', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'saved_categories': ['housing'],

@@ -8,6 +8,9 @@ library;
 
 import 'package:geolocator/geolocator.dart';
 
+/// Returns the phone's current position, asking for permission if needed.
+/// Throws an [Exception] with a readable message if location services are off
+/// or the user denies permission; the GPS fix gives up after 15 seconds.
 Future<Position> getDeviceLocation() async {
   if (!await Geolocator.isLocationServiceEnabled()) {
     throw Exception('Location services disabled');

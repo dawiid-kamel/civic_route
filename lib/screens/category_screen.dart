@@ -11,23 +11,33 @@ import '../models/issue.dart';
 import '../theme.dart';
 import 'results_screen.dart';
 
+/// Maps each government level key from the data to the label shown on its badge.
+/// Both federal chambers share the single "Federal" label.
 const Map<String, String> _levelLabel = {
   'federal_house': 'Federal', 'federal_senate': 'Federal', 'state': 'State', 'county': 'County',
 };
 
+/// Screen that shows one [IssueCategory]: its guide card and a list of sub-issues.
 class CategoryScreen extends StatefulWidget {
+  /// The category being displayed.
   final IssueCategory category;
+  /// Creates the screen for [category].
   CategoryScreen({required this.category});
 
+  /// Creates the state object for this screen.
   @override
   State<CategoryScreen> createState() => _CategoryScreenState();
 }
 
+/// State for [CategoryScreen]; it holds no mutable data, only builds the UI.
 class _CategoryScreenState extends State<CategoryScreen> {
+  /// Builds the scrolling page: a navy app bar, the guide card, then one tappable
+  /// card per sub-issue that opens [ResultsScreen].
   @override
   Widget build(BuildContext context) {
     final cat = widget.category;
     final colors = AppColors.of(context);
+    // Badge color for each level label; unknown labels fall back to muted gray.
     final levelColorFor = {
       'Federal': colors.federal,
       'State': colors.state,
@@ -74,6 +84,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, i) {
                 final sub = cat.subIssues[i];
+                // Turn level keys into unique display labels (so two federal keys show one badge).
                 final levels = sub.levels.map((l) => _levelLabel[l] ?? l).toSet().toList();
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -133,10 +144,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
 /// what it covers, who handles it (Federal / State / County, always in that
 /// order), and what to have ready before you contact an office.
 class _GuideCard extends StatelessWidget {
+  /// The category's explanation content (what it covers, who handles it, what to prepare).
   final CategoryGuide guide;
+  /// Palette to draw with, passed in so the card matches the current theme.
   final AppColors colors;
+  /// Creates the card for [guide] using [colors].
   const _GuideCard({required this.guide, required this.colors});
 
+  /// Builds the tinted card with its three sections.
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -166,13 +181,17 @@ class _GuideCard extends StatelessWidget {
     );
   }
 
+  /// Small accent-colored section title inside the card.
   Widget _heading(String text) => Text(
         text,
         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: colors.accent),
       );
 
+  /// Shared text style for the card's paragraphs.
   TextStyle _body() => TextStyle(fontSize: 14, color: colors.textPrimary, height: 1.45);
 
+  /// One Federal/State/County row: a colored pill plus the description, or a
+  /// grayed-out "Not usually involved." when [text] is null.
   Widget _levelRow(String label, String? text, Color color) {
     final involved = text != null;
     return Padding(

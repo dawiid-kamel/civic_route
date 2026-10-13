@@ -12,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/contact.dart';
 
+/// Saves [contacts] (with the current time) as the latest results for an issue.
+/// Failures are logged and ignored, since the cache is only a convenience.
 Future<void> saveCachedResults(String issueId, List<Contact> contacts) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -27,6 +29,8 @@ Future<void> saveCachedResults(String issueId, List<Contact> contacts) async {
   }
 }
 
+/// Loads the saved contacts and save time for an issue, or null if nothing is
+/// saved or the stored data is unreadable.
 Future<({DateTime savedAt, List<Contact> contacts})?> loadCachedResults(String issueId) async {
   try {
     final prefs = await SharedPreferences.getInstance();

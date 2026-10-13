@@ -10,6 +10,9 @@ library;
 import 'package:flutter/material.dart';
 import '../models/issue.dart';
 
+/// Every category shown in the app, in Home-grid order. Each [IssueCategory]
+/// lists its [Issue]s (with the government levels to look up) and a
+/// [CategoryGuide]; sections below are one per category.
 final List<IssueCategory> issueTree = [
   IssueCategory(
     id: "transportation", name: "Transportation", icon: Icons.directions_car_outlined,

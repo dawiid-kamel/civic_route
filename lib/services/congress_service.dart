@@ -14,7 +14,10 @@ import '../models/contact.dart';
 import 'api_client.dart';
 import 'congress_number.dart';
 
+/// How long a cached member-detail lookup stays fresh before it is re-fetched.
 const _detailTtl = Duration(hours: 12);
+/// In-memory cache of member details keyed by bioguide ID, with the time each
+/// was stored so stale entries can be ignored (see [_detailTtl].)
 final Map<String, ({DateTime at, Map<String, String?> data})> _detailCache = {};
 
 /// The chamber of a member's most recent term, e.g. "Senate" or "House of Representatives".
@@ -30,6 +33,8 @@ String? memberChamber(dynamic member) {
   return lastTerm is Map ? lastTerm['chamber']?.toString() : null;
 }
 
+/// GETs a Congress.gov [path] through the relay and returns the JSON object.
+/// Throws an [AppException] if the response is not a JSON object.
 Future<Map<String, dynamic>> _congressGet(String path, Map<String, String> query) async {
   final data = await getJson(relayUri('congress/$path', query), service: 'Congress.gov');
   if (data is! Map<String, dynamic>) {
@@ -38,6 +43,8 @@ Future<Map<String, dynamic>> _congressGet(String path, Map<String, String> query
   return data;
 }
 
+/// Returns the current U.S. House member for a state (two-letter code) and
+/// congressional [district] number as a list of [Contact]s.
 Future<List<Contact>> fetchFederalReps(String stateAbbr, String district) async {
   final data = await _congressGet(
     'member/congress/${currentCongress()}/$stateAbbr/$district',
@@ -47,6 +54,8 @@ Future<List<Contact>> fetchFederalReps(String stateAbbr, String district) async 
   return _contactsFor(members, 'U.S. House Representative');
 }
 
+/// Returns the two current U.S. senators for a state (two-letter code) as
+/// [Contact]s.
 Future<List<Contact>> fetchSenators(String stateAbbr) async {
   // This endpoint lists every current member of the state (a few dozen at
   // most), so one small request is enough to pick out the two senators.

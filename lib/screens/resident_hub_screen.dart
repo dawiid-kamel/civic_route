@@ -24,7 +24,9 @@ import '../theme.dart';
 import '../util/format.dart';
 import '../widgets/address_dialog.dart';
 
+/// Resident hub screen: local services, saved items, settings and guidance.
 class ResidentHubScreen extends StatefulWidget {
+  /// Title of a service tile to highlight when the screen opens, if any.
   final String? initialService;
 
   const ResidentHubScreen({this.initialService});
@@ -33,14 +35,22 @@ class ResidentHubScreen extends StatefulWidget {
   State<ResidentHubScreen> createState() => _ResidentHubScreenState();
 }
 
+/// State for [ResidentHubScreen]; holds the user's area label, saved items and
+/// notification switches.
 class _ResidentHubScreenState extends State<ResidentHubScreen> {
+  /// Text shown in the service area card, e.g. "County, ST".
   String locationLabel = 'Your local service area';
   // "County, ST" key (e.g. "Baltimore County, MD") used to look up local offices.
   String? countyName;
+  /// Names of the user's saved issue categories.
   List<String> savedCategoryNames = [];
+  /// Names of the user's saved individual issues.
   List<String> savedIssueNames = [];
+  /// Whether the "Local alerts" switch is on.
   bool alertsEnabled = true;
+  /// Whether the "Issue reminders" switch is on.
   bool remindersEnabled = true;
+  /// True while "Refresh my area" is fetching the device location.
   bool refreshing = false;
 
   @override
@@ -49,6 +59,8 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     _load();
   }
 
+  /// Reads the saved location and preferences, resolves the county name and
+  /// saved item names, and updates the screen.
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     var label = 'Your local service area';
@@ -91,6 +103,8 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     });
   }
 
+  /// Gets the device location, saves it as the user's area and reloads the screen.
+  /// Shows a snackbar if the location can't be read.
   Future<void> _refreshLocation() async {
     setState(() => refreshing = true);
     try {
@@ -111,17 +125,22 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     if (mounted) setState(() => refreshing = false);
   }
 
+  /// Opens the address dialog and reloads the screen if an address was saved.
   Future<void> _enterAddress() async {
     final saved = await promptForAddress(context);
     if (saved && mounted) await _load();
   }
 
+  /// Saves a true/false setting under [key] in shared preferences.
   Future<void> _setPreference(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
   }
 
+  /// Opens a bottom sheet for [service] listing the county offices for it
+  /// (or a notice if none are found).
   void _showService(HubService service, AppColors colors) {
+    // Offices for this service in the user's county, if a directory exists.
     final contacts = serviceContactsFor(countyName, service.title);
     final isCommunity = service.title == 'Community programs';
     showModalBottomSheet<void>(
@@ -183,6 +202,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Rounded notice box with an icon and [message], used for empty-state messages.
   Widget _sheetNotice(AppColors colors, IconData icon, String message) {
     return Container(
       width: double.infinity,
@@ -208,6 +228,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Card for one county office inside the service sheet, with call and website buttons.
   Widget _sheetContact(Contact c, AppColors colors) {
     final hasPhone = c.phone != null;
     final hasWebsite = c.website != null;
@@ -305,6 +326,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// "About" card with a reminder to confirm contact info and a privacy policy link.
   Widget _aboutCard(AppColors colors) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -331,12 +353,15 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Text style shared by the section headings on this screen.
   TextStyle _headingStyle(AppColors colors) => TextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w800,
     color: colors.textPrimary,
   );
 
+  /// Gradient card showing the service area, coverage pills and buttons to
+  /// refresh by GPS or enter an address.
   Widget _locationCard(AppColors colors) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -409,7 +434,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
             ),
           ),
           OutlinedButton.icon(
-            onPressed: refreshing ? null : _enterAddress,
+            onPressed: (refreshing || !AppConfig.enableAddressEntry) ? null : _enterAddress,
             icon: Icon(Icons.edit_location_alt_outlined, color: Colors.white, size: 18),
             label: Text(
               'Enter an address',
@@ -426,6 +451,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Small rounded label showing one kind of office or district covered.
   Widget _locationPill(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -445,6 +471,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Tappable tile for one hub service; highlighted when it matches [ResidentHubScreen.initialService].
   Widget _serviceTile(HubService service, AppColors colors) {
     final highlighted = widget.initialService == service.title;
     return Semantics(
@@ -489,6 +516,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Card listing saved categories and issues as chips, or a hint to save some if there are none.
   Widget _savedCard(AppColors colors) {
     final hasAny = savedCategoryNames.isNotEmpty || savedIssueNames.isNotEmpty;
     return Container(
@@ -558,6 +586,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Card with the alerts and reminders switches plus a status line.
   Widget _settingsCard(AppColors colors) {
     return Card(
       elevation: 0,
@@ -625,6 +654,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// Card with short tips on preparing before contacting an office.
   Widget _guidanceCard(AppColors colors) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -663,6 +693,7 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
     );
   }
 
+  /// One icon-and-text tip row inside the guidance card.
   Widget _guidanceRow(IconData icon, String text, AppColors colors) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
