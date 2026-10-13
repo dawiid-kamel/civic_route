@@ -151,4 +151,22 @@ void main() {
       expect(parseAddressMatches({'result': {'addressMatches': []}}, 'x'), isEmpty);
     });
   });
+
+  group('parseNominatimMatches', () {
+    test('reads string coordinates and skips bad entries', () {
+      final matches = parseNominatimMatches([
+        {'lat': '39.4015', 'lon': '-76.6019', 'display_name': 'Towson, MD'},
+        {'lat': 'x', 'lon': '1'},
+      ], 'towson');
+      expect(matches.length, 1);
+      expect(matches.first.lat, 39.4015);
+      expect(matches.first.lng, -76.6019);
+      expect(matches.first.matched, 'Towson, MD');
+    });
+
+    test('handles malformed responses', () {
+      expect(parseNominatimMatches(null, 'x'), isEmpty);
+      expect(parseNominatimMatches({'a': 1}, 'x'), isEmpty);
+    });
+  });
 }

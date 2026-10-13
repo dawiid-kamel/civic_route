@@ -25,6 +25,7 @@
 <h2>Where your information goes</h2>
 <ul>
   <li><strong>U.S. Census Bureau geocoder</strong> receives your coordinates (or the address you typed, including while you type it so the app can suggest matches) to return your county and congressional district.</li>
+  <li><strong>OpenStreetMap Nominatim</strong> receives the address you typed only if the Census geocoder can't find it or can't be reached, to return coordinates. Nothing else is sent.</li>
   <li><strong>Civic Route's lookup relay</strong> (a small service run on Cloudflare) receives your approximate coordinates and forwards a request to <strong>Open States</strong> to find your state legislators. It also forwards requests to <strong>Congress.gov</strong> for your federal officials; those requests contain only your state and district, not your location. The relay does not store requests, and we do not keep logs of them. Cloudflare, as our infrastructure provider, may process network data to operate the service.</li>
   <li>Nothing is sold, shared for advertising, or used to track you across apps or sites.</li>
 </ul>

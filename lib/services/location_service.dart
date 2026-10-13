@@ -122,12 +122,55 @@ List<AddressMatch> parseAddressMatches(dynamic data, String typed) {
   return matches;
 }
 
-/// Finds coordinates for a street address using the Census geocoder (the best
-/// match). Used when the user submits what they typed without picking a suggestion.
+/// Finds coordinates for a street address (the best match). Tries the Census
+/// geocoder first and, if it finds nothing or can't be reached, falls back to
+/// OpenStreetMap's Nominatim, which is more forgiving of typos, ZIP-only
+/// input and unusual formats. Used when the user submits what they typed
+/// without picking a suggestion.
 Future<AddressMatch> geocodeAddress(String address) async {
-  final matches = await searchAddresses(address);
-  if (matches.isEmpty) {
-    throw AppException("We couldn't find that address. Check the spelling and include the city and state.");
+  AppException? censusError;
+  try {
+    final matches = await searchAddresses(address);
+    if (matches.isNotEmpty) return matches.first;
+  } on AppException catch (e) {
+    censusError = e;
   }
-  return matches.first;
+  try {
+    final fallback = await _searchNominatim(address);
+    if (fallback.isNotEmpty) return fallback.first;
+  } on AppException catch (e) {
+    throw censusError ?? e;
+  }
+  throw censusError ??
+      AppException("We couldn't find that address. Check the spelling and include the city and state.");
+}
+
+Future<List<AddressMatch>> _searchNominatim(String address) async {
+  final url = Uri.https('nominatim.openstreetmap.org', '/search', {
+    'q': address.trim(),
+    'format': 'jsonv2',
+    'countrycodes': 'us',
+    'limit': '1',
+  });
+  // Nominatim's usage policy asks apps to identify themselves.
+  final data = await getJson(
+    url,
+    headers: {'User-Agent': 'CivicRoute/1.0 (Flutter app)'},
+    service: 'The address lookup service',
+  );
+  return parseNominatimMatches(data, address);
+}
+
+/// Reads a Nominatim search response (a JSON list) into matches (pure, unit tested).
+List<AddressMatch> parseNominatimMatches(dynamic data, String typed) {
+  if (data is! List) return const [];
+  final matches = <AddressMatch>[];
+  for (final m in data) {
+    if (m is! Map) continue;
+    final lat = double.tryParse(m['lat']?.toString() ?? '');
+    final lng = double.tryParse(m['lon']?.toString() ?? '');
+    if (lat == null || lng == null) continue;
+    matches.add((lat: lat, lng: lng, matched: m['display_name']?.toString() ?? typed));
+  }
+  return matches;
 }
