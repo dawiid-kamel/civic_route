@@ -62,10 +62,15 @@ LocationInfo parseCensusResponse(dynamic data, double lat, double lng) {
   } else {
     final first = districts[0];
     if (first is Map) {
-      final cdKey = first.keys.firstWhere(
-        (k) => RegExp(r'^CD\d+$').hasMatch(k.toString()),
-        orElse: () => null,
-      );
+      // A plain loop: `firstWhere(orElse: () => null)` throws a type error at
+      // runtime because decoded JSON map keys are Strings, not nullable.
+      Object? cdKey;
+      for (final k in first.keys) {
+        if (RegExp(r'^CD\d+$').hasMatch(k.toString())) {
+          cdKey = k;
+          break;
+        }
+      }
       final raw = cdKey == null ? null : first[cdKey]?.toString();
       district = raw == null ? null : int.tryParse(raw)?.toString();
     }
