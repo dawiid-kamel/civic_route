@@ -435,13 +435,17 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
           ),
           OutlinedButton.icon(
             onPressed: (refreshing || !AppConfig.enableAddressEntry) ? null : _enterAddress,
-            icon: Icon(Icons.edit_location_alt_outlined, color: Colors.white, size: 18),
+            // Faded when address entry is switched off (see AppConfig.enableAddressEntry).
+            icon: Icon(Icons.edit_location_alt_outlined,
+                color: AppConfig.enableAddressEntry ? Colors.white : Colors.white24, size: 18),
             label: Text(
               'Enter an address',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                  color: AppConfig.enableAddressEntry ? Colors.white : Colors.white30,
+                  fontWeight: FontWeight.w700),
             ),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: Colors.white54),
+              side: BorderSide(color: AppConfig.enableAddressEntry ? Colors.white54 : Colors.white12),
             ),
           ),
             ],

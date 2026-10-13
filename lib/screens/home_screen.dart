@@ -188,9 +188,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.edit_location_alt_outlined, color: Colors.white),
-                title: Text('Enter an address', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                // Grayed out when address entry is switched off (see AppConfig.enableAddressEntry).
+                // Grayed out (faded icon and text) when address entry is switched off,
+                // see AppConfig.enableAddressEntry. The colors are set by hand because
+                // they are hard-coded white and would not fade on their own.
+                leading: Icon(Icons.edit_location_alt_outlined,
+                    color: AppConfig.enableAddressEntry ? Colors.white : Colors.white24),
+                title: Text('Enter an address',
+                    style: TextStyle(
+                        color: AppConfig.enableAddressEntry ? Colors.white : Colors.white30,
+                        fontWeight: FontWeight.w700)),
                 enabled: AppConfig.enableAddressEntry,
                 onTap: AppConfig.enableAddressEntry ? () => Navigator.pop(context, 'address') : null,
               ),
@@ -1108,7 +1114,8 @@ class _CategoryCardState extends State<_CategoryCard> {
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
-                maxLines: 1,
+                // Long names ("Employment & Labor", "Zoning & Development") wrap to a second line.
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               SizedBox(height: 4),

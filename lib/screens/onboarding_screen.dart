@@ -141,7 +141,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     OutlinedButton(
                       onPressed: (busy || !AppConfig.enableAddressEntry) ? null : useAddress,
                       style: OutlinedButton.styleFrom(minimumSize: Size(double.infinity, 52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                      child: Text('Enter an address instead', style: TextStyle(fontWeight: FontWeight.bold)),
+                      // Explicitly grayed when address entry is switched off (see AppConfig.enableAddressEntry).
+                      child: Text('Enter an address instead',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppConfig.enableAddressEntry ? null : colors.muted.withValues(alpha: 0.5))),
                     ),
                     SizedBox(height: 4),
                     // Denying/skipping location used to leave you stuck on
