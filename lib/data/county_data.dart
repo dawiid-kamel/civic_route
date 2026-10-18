@@ -214,8 +214,9 @@ List<Contact> _pick(String county, List<String> names) {
 // - Baltimore City, not the County, bills and services County water accounts.
 // - MTA Maryland (state) runs the region's local buses, light rail and Metro.
 // - 211 Maryland is the state's free referral line for local help programs.
-// The Department of Aging has no phone listed because the published numbers
-// disagree; its page links to every senior center's own number.
+// The Department of Aging's main number (410-887-2594) was supplied by the app
+// owner in October 2026; each senior center also has its own number on the
+// department's page.
 Map<String, Map<String, List<Contact>>> get countyServiceDirectory => {
   "Baltimore County, MD": {
     "City services": _pick("Baltimore County, MD", [
@@ -282,9 +283,10 @@ Map<String, Map<String, List<Contact>>> get countyServiceDirectory => {
     ]),
     "Community programs": [
       Contact(
-        lastVerified: "2026-09",
+        lastVerified: "2026-10",
         name: "Baltimore County Department of Aging",
         office: "Senior centers, classes, and events",
+        phone: "410-887-2594",
         website: "https://www.baltimorecountymd.gov/departments/aging",
         level: "county",
       ),

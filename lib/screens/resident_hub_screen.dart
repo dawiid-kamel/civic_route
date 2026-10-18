@@ -22,6 +22,7 @@ import '../services/resolver_service.dart';
 import '../theme.dart';
 import '../util/format.dart';
 import '../widgets/address_dialog.dart';
+import 'onboarding_screen.dart';
 
 class ResidentHubScreen extends StatefulWidget {
   final String? initialService;
@@ -320,13 +321,60 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
             style: TextStyle(color: colors.muted, fontSize: 13, height: 1.4),
           ),
           SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () => openLink(context, Uri.parse(AppConfig.privacyPolicyUrl)),
-            icon: Icon(Icons.privacy_tip_outlined, size: 18),
-            label: Text('Privacy policy'),
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: () => openLink(context, Uri.parse(AppConfig.privacyPolicyUrl)),
+                icon: Icon(Icons.privacy_tip_outlined, size: 18),
+                label: Text('Privacy policy'),
+              ),
+              TextButton.icon(
+                onPressed: _clearSavedData,
+                icon: Icon(Icons.delete_outline, size: 18),
+                label: Text('Clear saved data'),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  /// Removes everything the app stored on this device (location, saved topics,
+  /// starred officials, progress, cached lists) and returns to setup. This is
+  /// the "delete my data" control the privacy policy points to.
+  Future<void> _clearSavedData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Clear saved data?'),
+        content: Text(
+          'This removes your saved location, saved topics, starred officials and progress '
+          'notes from this device. You can set everything up again at any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text('Clear data'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    // Keep the walkthrough from replaying; location setup is the useful restart point.
+    await prefs.setBool('tutorial_seen', true);
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => OnboardingScreen()),
+      (route) => false,
     );
   }
 
@@ -371,16 +419,10 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
             ),
           ),
           SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              'City offices',
-              'County offices',
-              'State offices',
-              'House district',
-              'Senate district',
-            ].map((label) => _locationPill(label)).toList(),
+          // Plain text, not pills: these are not tappable.
+          Text(
+            'Covers city, county and state offices, plus your House and Senate districts.',
+            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
           ),
           SizedBox(height: 14),
           Wrap(
@@ -421,25 +463,6 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _locationPill(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }
@@ -521,32 +544,9 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
                   ),
                 ),
                 SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ...savedCategoryNames.map(
-                      (name) => Chip(
-                        label: Text(name),
-                        avatar: Icon(
-                          Icons.bookmark,
-                          size: 16,
-                          color: colors.accent,
-                        ),
-                      ),
-                    ),
-                    ...savedIssueNames.map(
-                      (name) => Chip(
-                        label: Text(name),
-                        avatar: Icon(
-                          Icons.flag_outlined,
-                          size: 16,
-                          color: colors.accent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                // Plain rows, not Chips: chips look tappable and these aren't.
+                ...savedCategoryNames.map((name) => _savedRow(Icons.bookmark, name, colors)),
+                ...savedIssueNames.map((name) => _savedRow(Icons.flag_outlined, name, colors)),
                 SizedBox(height: 4),
                 Text(
                   'Track each saved topic from Not started to Resolved.',
@@ -554,6 +554,24 @@ class _ResidentHubScreenState extends State<ResidentHubScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _savedRow(IconData icon, String name, AppColors colors) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: colors.accent),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

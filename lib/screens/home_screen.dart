@@ -14,9 +14,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
 import '../data/issue_tree.dart';
+import '../data/search.dart';
 import '../data/services_data.dart';
 import '../models/issue.dart';
 import '../services/device_location_service.dart';
+import '../services/launcher.dart';
 import '../services/resolver_service.dart';
 import '../theme.dart';
 import '../widgets/address_dialog.dart';
@@ -240,23 +242,96 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<IssueCategory> get filteredCategories {
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) return issueTree;
+  /// What the user typed, trimmed. Non-empty means "searching": the screen
+  /// then shows only the matching issues instead of its usual panels.
+  String get _query => _searchController.text.trim();
 
-    return issueTree.where((category) {
-      final haystack = [
-        category.name,
-        category.description,
-        ...category.subIssues.map((issue) => issue.name),
-        ...category.subIssues.map((issue) => issue.description),
-      ].join(' ').toLowerCase();
-      return haystack.contains(query);
-    }).toList();
+  void _clearSearch() {
+    _searchController.clear();
+    FocusScope.of(context).unfocus();
+    setState(() {});
+  }
+
+  void _openIssueFromSearch(IssueCategory cat, Issue issue) {
+    _trackRecent(cat.id);
+    _openIssue(issue);
+  }
+
+  /// Search results: just the categories (and the topics inside them) that
+  /// match what was typed, so you can see where the issue belongs.
+  Widget _searchResultsSliver(List<SearchHit> hits, String query) {
+    final emptyStyle = TextStyle(color: Colors.white70, fontSize: 13, height: 1.45);
+    return SliverPadding(
+      padding: EdgeInsets.fromLTRB(20, 4, 20, 32 + MediaQuery.of(context).padding.bottom),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          if (hits.isEmpty)
+            _infoPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nothing matched "$query"',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Try describing the problem in your own words, like "pothole on my street" '
+                    'or "landlord won\'t fix the heat", or search a single word such as "rent" or "vote".',
+                    style: emptyStyle,
+                  ),
+                  SizedBox(height: 4),
+                  TextButton(
+                    onPressed: _clearSearch,
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: Colors.white),
+                    child: Text('Browse all categories', style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                hits.length == 1 ? '1 matching category' : '${hits.length} matching categories',
+                style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+            for (final hit in hits)
+              _SearchResultCard(
+                hit: hit,
+                saved: savedCategories.contains(hit.category.id),
+                onToggleSave: () => _toggleSaved(hit.category.id),
+                onOpenCategory: () => _openCategory(hit.category),
+                onOpenIssue: (issue) => _openIssueFromSearch(hit.category, issue),
+              ),
+          ],
+        ]),
+      ),
+    );
+  }
+
+  /// A plain, non-tappable information panel. It is deliberately flat (no
+  /// border, no chevron) so it can't be mistaken for a button or a row you can tap.
+  Widget _infoPanel({required Widget child, EdgeInsets padding = const EdgeInsets.all(14)}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: padding,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: child,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final query = _query;
+    final searching = query.isNotEmpty;
+    final searchHits = searching ? searchIssues(query) : const <SearchHit>[];
+
     // Previously this was a second, hand-maintained copy of the "local
     // services" list that lived only on this screen and quietly drifted out
     // of sync with the resident hub's own copy (6 items here vs. 7 there,
@@ -312,6 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
         height: double.infinity,
         decoration: BoxDecoration(gradient: AppGradients.background),
         child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(20, safe.top + 12, 20, 8),
@@ -319,38 +395,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      GlassContainer(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        radius: 999,
-                        opacity: 0.18,
-                        tint: Colors.white,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: Colors.white,
-                              size: 14,
+                      // Plain label, not a pill: it isn't tappable ("Change area"
+                      // further down is the control for that).
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            color: Colors.white70,
+                            size: 14,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            locationLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white70,
                             ),
-                            SizedBox(width: 6),
-                            Text(
-                              locationLabel,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 20),
+                      SizedBox(height: 16),
                       Text(
                         "What's the issue?",
                         style: TextStyle(
@@ -360,15 +426,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(height: 6),
-                      Text(
-                        "Tap a category to see who handles it. Tap the bookmark to save it.",
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.white70,
-                          height: 1.4,
+                      if (!searching) ...[
+                        SizedBox(height: 6),
+                        Text(
+                          "Search, or tap a category to see who handles it. Tap the bookmark to save it.",
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.white70,
+                            height: 1.4,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -385,11 +453,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: TextField(
                       controller: _searchController,
                       onChanged: (_) => setState(() {}),
+                      textInputAction: TextInputAction.search,
                       style: TextStyle(color: Colors.white, fontSize: 15),
                       decoration: InputDecoration(
-                        hintText: 'Search issues and services',
+                        hintText: 'Search or ask, e.g. "who fixes potholes?"',
                         hintStyle: TextStyle(color: Colors.white70),
                         prefixIcon: Icon(Icons.search, color: Colors.white70),
+                        suffixIcon: searching
+                            ? IconButton(
+                                tooltip: 'Clear search',
+                                icon: Icon(Icons.close, color: Colors.white70),
+                                onPressed: _clearSearch,
+                              )
+                            : null,
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(
                           horizontal: 16,
@@ -400,6 +476,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              // While searching, every other panel is hidden so only the
+              // matching issues show. Clearing the search brings them all back.
+              if (searching)
+                _searchResultsSliver(searchHits, query)
+              else ...[
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
                 sliver: SliverToBoxAdapter(
@@ -436,15 +517,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                       SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                          ),
-                        ),
+                      _infoPanel(
                         child: Row(
                           children: [
                             Icon(
@@ -490,7 +563,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
-                      SizedBox(height: 12),
                       SizedBox(
                         height: 150,
                         child: ListView.separated(
@@ -537,6 +609,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
+                      SizedBox(height: 20),
+                      _emergencySection(),
                     ],
                   ),
                 ),
@@ -572,39 +646,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 32 + safe.bottom),
-                sliver: filteredCategories.isEmpty
-                    ? SliverToBoxAdapter(
-                        child: GlassContainer(
-                          padding: EdgeInsets.all(20),
-                          opacity: 0.18,
-                          radius: 18,
-                          child: Text(
-                            'No matching issues yet. Try another keyword.',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      )
-                    : SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 14,
-                          crossAxisSpacing: 14,
-                          childAspectRatio: 0.92,
-                        ),
-                        delegate: SliverChildBuilderDelegate((context, i) {
-                          final cat = filteredCategories[i];
-                          return _CategoryCard(
-                            cat: cat,
-                            saved: savedCategories.contains(cat.id),
-                            onToggleSave: () => _toggleSaved(cat.id),
-                            onOpen: () => _openCategory(cat),
-                          );
-                        }, childCount: filteredCategories.length),
-                      ),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    childAspectRatio: 0.92,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, i) {
+                    final cat = issueTree[i];
+                    return _CategoryCard(
+                      cat: cat,
+                      saved: savedCategories.contains(cat.id),
+                      onToggleSave: () => _toggleSaved(cat.id),
+                      onOpen: () => _openCategory(cat),
+                    );
+                  }, childCount: issueTree.length),
+                ),
               ),
+              ],
             ],
           ),
         ),
@@ -612,16 +672,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Quick calls for urgent situations. These are real buttons (tap to dial).
+  Widget _emergencySection() {
+    Widget call(String number) => OutlinedButton.icon(
+          onPressed: () => openLink(context, phoneUri(number)),
+          icon: Icon(Icons.call, color: Colors.white, size: 16),
+          label: Text(
+            'Call $number',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Need help right now?',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
+        ),
+        SizedBox(height: 6),
+        Text(
+          '911 for emergencies. 988 for a mental health crisis. 211 for food, housing and other local help.',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+        ),
+        SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            call('911'),
+            call('988'),
+            call('211'),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _coverageNoteCard() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
+    return _infoPanel(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -709,14 +802,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         SizedBox(height: 10),
         if (cats.isEmpty && issues.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-            ),
+          _infoPanel(
             child: Row(
               children: [
                 Icon(Icons.bookmark_border, color: Colors.white, size: 18),
@@ -767,7 +853,13 @@ class _ServiceTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white, size: 20),
+            Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 20),
+                Spacer(),
+                Icon(Icons.arrow_forward, color: Colors.white70, size: 14),
+              ],
+            ),
             SizedBox(height: 12),
             Text(
               title,
@@ -815,9 +907,8 @@ class _AlertCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          color: Colors.white.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -866,9 +957,8 @@ class _EmptyAlertsCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          color: Colors.white.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -921,17 +1011,30 @@ class _DashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Tappable cards get a fill, a border and an arrow; plain stats are flat
+    // text, so only things you can tap look tappable.
+    final tappable = onTap != null;
     final card = Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
+      decoration: tappable
+          ? BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+            )
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white, size: 18),
+          Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 18),
+              if (tappable) ...[
+                Spacer(),
+                Icon(Icons.arrow_forward, color: Colors.white70, size: 14),
+              ],
+            ],
+          ),
           SizedBox(height: 10),
           Text(
             label,
@@ -1075,3 +1178,137 @@ class _CategoryCardState extends State<_CategoryCard> {
   }
 }
 
+
+/// One search result: the matching category (tap to open it, bookmark to save
+/// it) with the specific topics inside it that matched (tap to go straight to
+/// who handles that topic). Everything tappable has a chevron.
+class _SearchResultCard extends StatelessWidget {
+  final SearchHit hit;
+  final bool saved;
+  final VoidCallback onToggleSave;
+  final VoidCallback onOpenCategory;
+  final void Function(Issue issue) onOpenIssue;
+
+  const _SearchResultCard({
+    required this.hit,
+    required this.saved,
+    required this.onToggleSave,
+    required this.onOpenCategory,
+    required this.onOpenIssue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cat = hit.category;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.12),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              button: true,
+              label: 'Open ${cat.name}',
+              child: InkWell(
+                onTap: onOpenCategory,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 4, 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(cat.icon, color: Colors.white, size: 20),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cat.name,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              cat.description,
+                              style: TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: saved ? 'Remove ${cat.name} from saved topics' : 'Save ${cat.name}',
+                        onPressed: onToggleSave,
+                        icon: Icon(
+                          saved ? Icons.bookmark : Icons.bookmark_border,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: Colors.white70),
+                      SizedBox(width: 6),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            for (final issue in hit.issues) ...[
+              Divider(height: 1, color: Colors.white.withValues(alpha: 0.15)),
+              Semantics(
+                button: true,
+                label: issue.name,
+                child: InkWell(
+                  onTap: () => onOpenIssue(issue),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.flag_outlined, color: Colors.white70, size: 16),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                issue.name,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                issue.description,
+                                style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.3),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: Colors.white70),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

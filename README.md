@@ -9,6 +9,9 @@ A Flutter app that answers "who do I actually call?" Pick an issue (housing, tra
 
 Local county coverage is currently **Baltimore County, MD**. Other counties get federal and state officials plus a fallback to USA.gov and 211.
 
+## Search
+The Home search box accepts a word ("rent"), a phrase, or a whole question ("who do I call about a missed trash pickup?"). While you type, the other panels hide and only the matching categories and topics show. The matching lives in `lib/data/search.dart`; add words to its `_keywords` map when a new issue or category is added.
+
 ## Run it
 ```
 flutter pub get

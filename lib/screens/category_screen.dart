@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import '../models/issue.dart';
 import '../theme.dart';
+import '../widgets/level_tag.dart';
 import 'results_screen.dart';
 
 const Map<String, String> _levelLabel = {
@@ -100,20 +101,18 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                   SizedBox(height: 4),
                                   Text(sub.description, style: TextStyle(color: colors.muted, fontSize: 13, height: 1.3)),
                                   SizedBox(height: 10),
-                                  Wrap(spacing: 6, children: levels.map((l) => Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(color: levelColorFor[l] ?? colors.muted, borderRadius: BorderRadius.circular(999)),
-                                    child: Text(l, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                  )).toList()),
+                                  Wrap(
+                                    spacing: 14,
+                                    runSpacing: 4,
+                                    children: levels
+                                        .map((l) => LevelTag(label: l, color: levelColorFor[l] ?? colors.muted))
+                                        .toList(),
+                                  ),
                                 ],
                               ),
                             ),
                             SizedBox(width: 8),
-                            Container(
-                              width: 32, height: 32,
-                              decoration: BoxDecoration(color: colors.surfaceTertiary, shape: BoxShape.circle),
-                              child: Icon(Icons.chevron_right, color: colors.muted, size: 18),
-                            ),
+                            Icon(Icons.chevron_right, color: colors.muted),
                           ],
                         ),
                       ),
@@ -180,21 +179,17 @@ class _GuideCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 64,
-            margin: const EdgeInsets.only(top: 1),
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            decoration: BoxDecoration(
-              color: involved ? color : colors.surfaceTertiary,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: involved ? Colors.white : colors.muted, fontSize: 11, fontWeight: FontWeight.bold),
+          SizedBox(
+            width: 76,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: LevelTag(label: label, color: involved ? color : colors.muted),
+              ),
             ),
           ),
-          SizedBox(width: 10),
+          SizedBox(width: 6),
           Expanded(
             child: Text(
               text ?? 'Not usually involved.',

@@ -23,6 +23,7 @@ import '../util/format.dart';
 import '../models/contact.dart';
 import '../services/resolver_service.dart';
 import '../theme.dart';
+import '../widgets/level_tag.dart';
 
 class ResultsScreen extends StatefulWidget {
   final Issue issue;
@@ -658,23 +659,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: levelColor,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    c.level[0].toUpperCase() + c.level.substring(1),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                LevelTag(
+                  label: c.level[0].toUpperCase() + c.level.substring(1),
+                  color: levelColor,
                 ),
               ],
             ),

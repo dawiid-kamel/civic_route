@@ -5,13 +5,7 @@ Work top to bottom. Items marked **you** need your accounts or decisions.
 ## 1. Secrets (do first)
 - [ ] **you** Rotate both API keys (Congress.gov and Open States). The old ones are in git history and in zips you shared.
 - [ ] **you** Deploy the relay: see `worker/README.md`. Note the URL it prints.
-- [ ] Stop tracking secrets and junk, from the project root:
-  ```
-  git rm --cached .env .DS_Store 2>/dev/null
-  git rm -r --cached build .dart_tool 2>/dev/null
-  git add .gitignore && git commit -m "Stop tracking secrets and build output"
-  ```
-  The old `.env` is still in history; rotating the keys is what makes that harmless. (Optional: scrub history with `git filter-repo --path .env --invert-paths`.)
+- [x] `.env` and `.DS_Store` are no longer tracked and `.gitignore` is rewritten. The old `.env` is still in git history; rotating the keys is what makes that harmless. (Optional: scrub history with `git filter-repo --path .env --invert-paths`.)
 - [ ] Delete the duplicate `civic_route-1/` folder and any `__MACOSX/` folder from the repo (they should never be in the zip you submit).
 - [ ] Delete your local `.env`; the app no longer reads it.
 
