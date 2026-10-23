@@ -1,0 +1,126 @@
+# ---------------------------------------------------------------------------
+# Civic Route .gitignore
+# Keep out: secrets, signing keys, build output, generated files, machine- and
+# editor-specific files, and stray exports. Keep in: source, assets, docs,
+# pubspec.lock (this is an app), and the platform folders Flutter generated.
+# ---------------------------------------------------------------------------
+
+# Secrets and local config (never commit these)
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.key
+*.keystore
+*.jks
+key.properties
+*.mobileprovision
+secrets.*
+service-account*.json
+
+# Node tooling (not used by the app itself)
+node_modules/
+
+# Operating system files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+__MACOSX/
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editors and IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+.history
+.atom/
+.svn/
+.build/
+.buildlog/
+.swiftpm/
+migrate_working_dir/
+
+# Flutter / Dart
+.dart_tool/
+.pub-cache/
+.pub/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+.widget_preview/
+build/
+coverage/
+lcov.info
+**/doc/api/
+devtools_options.yaml
+
+# Symbolication and obfuscation maps
+app.*.symbols
+app.*.map.json
+
+# Android
+android/.gradle/
+android/.kotlin/
+android/captures/
+android/local.properties
+android/gradlew
+android/gradlew.bat
+android/gradle/wrapper/gradle-wrapper.jar
+android/app/debug/
+android/app/profile/
+android/app/release/
+**/android/**/GeneratedPluginRegistrant.java
+.cxx/
+.externalNativeBuild/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# iOS / macOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/.last_build_id
+ios/ServiceDefinitions.json
+macos/Pods/
+macos/Flutter/ephemeral/
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Windows / Linux desktop build output
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# Logs and scratch files
+*.log
+*.pyc
+*.tmp
+*.bak
+*.orig
+
+# Archives and duplicate project copies (they get zipped by accident when
+# preparing a submission; the project should be submitted from a clean checkout)
+*.zip
+*.tar
+*.tar.gz
+civic_route-*/
